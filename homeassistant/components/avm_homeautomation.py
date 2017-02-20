@@ -185,7 +185,7 @@ class AvmHomeAutomationBase(object):
 
         return
     
-    @asyncio
+    @asyncio.coroutine
     def async_get_devices_xml(self):
         from xml.etree import ElementTree as ET
         try:
@@ -202,7 +202,6 @@ class AvmHomeAutomationBase(object):
         try:
             self._devices_xml = yield from self.async_get_devices_xml()
         except Exception as e:
-            print("exception consumed: %s" % str(e))
             return
         else:
             if self._devices_xml is None:
@@ -269,7 +268,6 @@ class AvmHomeAutomationBase(object):
     def get_device_dict(self, ain):
         if ain in self._devices.keys():
             if self._devices[ain]['dict'] == None:
-                print("Update Dict %s" % ain)
                 self._devices[ain]['dict'] = self._create_device_dict(ain)
             
             dict = self._devices[ain]['dict']
@@ -394,9 +392,7 @@ class AvmHomeAutomationDevice(Entity):
     
     def __init__(self, hass, ain, aha):
         """Initialize the switch."""
-        
-        print(__class__.__name__)
-        
+                
         self._aha = aha
         self._ain = ain
         
