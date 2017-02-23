@@ -4,14 +4,12 @@ Created on 16.02.2017
 @author: Christian
 '''
 
+import asyncio
 import logging
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 
-from typing import Optional, List
-
-from homeassistant.const import (
-    STATE_ON, STATE_OFF, STATE_UNKNOWN, TEMP_CELSIUS)
+from homeassistant.const import (STATE_ON, STATE_OFF, STATE_UNKNOWN)
 from homeassistant.components.switch import (SwitchDevice)
 from homeassistant.components.avm_homeautomation import (AvmHomeAutomationDevice, 
     ATTR_DISCOVER_DEVICES, DATA_AVM_HOMEAUTOMATION, DOMAIN,
@@ -22,8 +20,8 @@ _LOGGER = logging.getLogger(__name__)
 
 DEPENDENCIES = ['avm_homeautomation']
 
-
-def setup_platform(hass, config, add_devices, discovery_info=None):
+@asyncio.coroutine
+def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Setup the avm_smarthome switch platform."""
 
     if discovery_info is None:
@@ -36,7 +34,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         for __ain  in __ains:
             __aha = hass.data[DATA_AVM_HOMEAUTOMATION][DOMAIN]
             _LOGGER.debug("Adding device '%s'" % __ain)
-            add_devices([AvmHomeAutomationDeviceSwitch(hass, __ain, __aha)], True)
+            yield from async_add_entities([AvmHomeAutomationDeviceSwitch(hass, __ain, __aha)], update_before_add=True)
     return
 
 ATTR_CURRENT_CONSUMPTION = 'Current Consumption'
@@ -48,7 +46,7 @@ ATTR_TOTAL_CONSUMPTION_UNIT = 'kWh'
 ATTR_TEMPERATURE = 'Temperature'
 
 
-SCHEMA_DICT_SWITCH = vol.Schema({
+VAL_SCHEMA_DICT_SWITCH = vol.Schema({
             # Attributes
             vol.Required('@identifier'):      cv.string,
             vol.Required('@id'):              cv.positive_int,
@@ -66,11 +64,17 @@ SCHEMA_DICT_SWITCH = vol.Schema({
             vol.Required('private_updated'):  cv.boolean,
         }, extra=vol.ALLOW_EXTRA)
 
+HM_ATTRIBUTE_SUPPORT = {
+    'mode':       ['mode',       {}],
+    'lock':       ['lock',       {0: 'No', 1: 'Yes'}],
+    'devicelock': ['devicelock', {0: 'No', 1: 'Yes'}],
+}
+
 class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
     """Representation of a FRITZ!DECT switch."""
     
     def _validate_schema(self, value):
-        SCHEMA_DICT_SWITCH(value)
+        VAL_SCHEMA_DICT_SWITCH(value)
     
     @property
     def current_power_watt(self):
@@ -108,51 +112,47 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
     def device_state_attributes(self):
         """Return the state attributes of the device."""
         attrs = {}
+        
+        # no data available to create
+        if not self.available:
+            return attrs
 
         attrs[ATTR_CURRENT_CONSUMPTION] = "%.1f %s" % \
             (self.current_power_watt, ATTR_CURRENT_CONSUMPTION_UNIT)
         attrs[ATTR_TOTAL_CONSUMPTION] = "%.3f %s" % \
             (self.total_energy_killo_watt_hours, ATTR_TOTAL_CONSUMPTION_UNIT)
-        attrs[ATTR_TEMPERATURE] = "%.1f %s" % (self.current_temperature, self.units.temperature_unit)
-
+        attrs[ATTR_TEMPERATURE] = "%.1f %s" % (self.current_temperature, self.units.temperature_unit)     
+                
+        # Generate an attributes list
+        for node, data in HM_ATTRIBUTE_SUPPORT.items():
+            # Is an attributes and exists for this object
+            if node in self._dict['switch']:
+                value = str(self._dict['switch'][node])
+                try:
+                    value = data[1].get(int(self._dict['switch'][node]), str(self._dict['switch'][node]))
+                except Exception:
+                    pass
+                attrs[data[0]] = value
+ 
         return attrs
     
     ## Import from ToggleEntity
     @property
     def is_on(self) -> bool:
         """Return True if entity is on."""
-        __state = False
-        if self._assumed_state == True:
-            __state = bool(int(self._aha.send_switch_command({'switchcmd': 'getswitchstate'}, self._ain)))
-        else:
-            __state = bool(int(self._dict['switch']['state']))
-        return __state
+        return bool(int(self._dict['switch']['state']))     
         
-    def turn_on(self, **kwargs) -> None:
+    @asyncio.coroutine
+    def async_turn_on(self, **kwargs) -> None:
         """Turn the entity on."""
-        self._aha.send_switch_command({'switchcmd': 'setswitchon'}, self._ain)
+        yield from self._aha.async_send_switch_command({'switchcmd': 'setswitchon'}, self._ain)
         self._dict['switch']['state'] = True
-        self._assumed_state = True
 
-    def turn_off(self, **kwargs) -> None:
+    @asyncio.coroutine
+    def async_turn_off(self, **kwargs) -> None:
         """Turn the entity off."""
-        self._aha.send_switch_command({'switchcmd': 'setswitchoff'}, self._ain)
+        yield from self._aha.async_send_switch_command({'switchcmd': 'setswitchoff'}, self._ain)
         self._dict['switch']['state'] = False
-        self._assumed_state = True
             
     ## Import from SwitchDevice
     ## None
-    
-#     @property
-#     def state_attributes(self):
-#         """Return the optional state attributes."""
-#         data = {}
-# 
-#         for prop, attr in PROP_TO_ATTR.items():
-#             value = getattr(self, prop)
-#             if value:
-#                 data[attr] = value
-# 
-#         return data
-    
-    
