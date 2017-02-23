@@ -3,28 +3,22 @@ Created on 16.02.2017
 
 @author: Christian
 '''
+
+import asyncio
 import logging
 import voluptuous as vol
-from voluptuous.schema_builder import Required, Optional, Remove
 import homeassistant.helpers.config_validation as cv
 
 from datetime import timedelta
 
-from homeassistant.components.climate import (
-    STATE_AUTO, STATE_OFF, STATE_ON, ClimateDevice,
-    PRECISION_HALVES, PRECISION_TENTHS, ATTR_CURRENT_TEMPERATURE, 
-    ATTR_TARGET_TEMP_HIGH, ATTR_TARGET_TEMP_LOW, ATTR_MAX_TEMP, ATTR_MIN_TEMP, 
-    ATTR_OPERATION_MODE)
+from homeassistant.components.climate import (STATE_AUTO, STATE_OFF, STATE_ON, ClimateDevice)
 
-from homeassistant.const import (
-    ATTR_TEMPERATURE, TEMP_CELSIUS, STATE_UNKNOWN, ATTR_WAKEUP)
+from homeassistant.const import (ATTR_TEMPERATURE, TEMP_CELSIUS, STATE_UNKNOWN)
 
 from homeassistant.components.avm_homeautomation import (
     ATTR_DISCOVER_DEVICES, DATA_AVM_HOMEAUTOMATION, DOMAIN,
     AvmHomeAutomationDevice, SCHEMA_DICT_SWITCH, SCHEMA_DICT_POWERMETER,
     SCHEMA_DICT_TEMPERATURE, SCHEMA_DICT_HKR)
-
-from tkinter.constants import OFF
 
 SCAN_INTERVAL = timedelta(minutes=1)
 
@@ -32,7 +26,8 @@ _LOGGER = logging.getLogger(__name__)
 
 DEPENDENCIES = ['avm_homeautomation']
 
-def setup_platform(hass, config, add_devices, discovery_info=None):
+@asyncio.coroutine
+def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Setup the avm_smarthome switch platform."""
                 
     if discovery_info is None:
@@ -43,7 +38,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         for __ain  in __ains:
             __aha = hass.data[DATA_AVM_HOMEAUTOMATION][DOMAIN]
             _LOGGER.debug("Adding device '%s'" % __ain)
-            add_devices([AvmThermostat(hass, __ain, __aha)], True)
+            yield from async_add_entities([AvmThermostat(hass, __ain, __aha)], update_before_add=True)
                 
     return
 
@@ -68,6 +63,20 @@ SCHEMA_DICT_CLIMATE = vol.Schema({
 STATE_MANUAL = "manual"
 THERMOSTAT_STATES = [STATE_AUTO, STATE_MANUAL, STATE_ON, STATE_OFF]
 
+ATTR_BATTERY_STATE = "Battery"
+
+STATE_BATTERY_OK  = "Ok"
+STATE_BATTERY_LOW = "Low"
+
+BATTERY_STATES = [STATE_BATTERY_OK, STATE_BATTERY_LOW]
+
+HM_ATTRIBUTE_SUPPORT = {
+    'lock':       ['lock',       {0: 'No', 1: 'Yes'}],
+    'devicelock': ['devicelock', {0: 'No', 1: 'Yes'}],
+    'errorcode':  ['errorcode',  {}],
+    'batterylow': ['Battery',    {0: 'Normal', 1: 'Low'}],
+}
+
 class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
     """Representation of a AVM Thermostat."""
     
@@ -79,24 +88,24 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
         """The unit of measurement to display."""
         return self.hass.config.units.temperature_unit
     
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes of the device."""
-        attrs = {}
-        
-        if self.available == True:
-            attrs[ATTR_CURRENT_TEMPERATURE] = self.current_temperature
-        else:
-            attrs[ATTR_CURRENT_TEMPERATURE] = STATE_UNKNOWN
-        
-        attrs[ATTR_TEMPERATURE]      = self.target_temperature
-        attrs[ATTR_TARGET_TEMP_HIGH] = self.target_temperature_high
-        attrs[ATTR_TARGET_TEMP_LOW]  = self.target_temperature_low
-        attrs[ATTR_OPERATION_MODE]   = self.current_operation
-        attrs[ATTR_MAX_TEMP]         = self.max_temp
-        attrs[ATTR_MIN_TEMP]         = self.min_temp
-
-        return attrs
+#     @property
+#     def device_state_attributes(self):
+#         """Return the state attributes of the device."""
+#         attrs = {}
+#         
+#         if self.available == True:
+#             attrs[ATTR_CURRENT_TEMPERATURE] = self.current_temperature
+#         else:
+#             attrs[ATTR_CURRENT_TEMPERATURE] = STATE_UNKNOWN
+#         
+#         attrs[ATTR_TEMPERATURE]      = self.target_temperature
+#         attrs[ATTR_TARGET_TEMP_HIGH] = self.target_temperature_high
+#         attrs[ATTR_TARGET_TEMP_LOW]  = self.target_temperature_low
+#         attrs[ATTR_OPERATION_MODE]   = self.current_operation
+#         attrs[ATTR_MAX_TEMP]         = self.max_temp
+#         attrs[ATTR_MIN_TEMP]         = self.min_temp
+# 
+#         return attrs
             
     @property
     def state(self) -> str:
@@ -160,15 +169,17 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
         """Return the _temperature we try to reach."""
         return self.taget_temperature
     
-    def set_temperature(self, **kwargs):
+    @asyncio.coroutine
+    def async_set_temperature(self, **kwargs):
         """Set new target _temperature."""
         temperature = kwargs.get(ATTR_TEMPERATURE)
         temperature = int(temperature * 2.0)
-        self._aha.send_switch_command({'switchcmd': 'sethkrtsoll', 'param': str(temperature)}, self._ain)
+        yield from self._aha.async_send_switch_command({'switchcmd': 'sethkrtsoll', 'param': str(temperature)}, self._ain)
         self._dict['hkr']['tsoll'] = temperature
         return
     
-    def set_operation_mode(self, operation_mode):
+    @asyncio.coroutine
+    def async_set_operation_mode(self, operation_mode):
         """Set operation mode (auto, cool, heat, off)."""
         if operation_mode == STATE_OFF:
             temperature = 253
@@ -179,7 +190,7 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
         else:
             return
         
-        self._aha.send_switch_command({'switchcmd': 'sethkrtsoll', 'param': str(temperature)}, self._ain)
+        yield from self._aha.async_send_switch_command({'switchcmd': 'sethkrtsoll', 'param': str(temperature)}, self._ain)
         self._dict['hkr']['tsoll'] = temperature
             
         return
@@ -193,4 +204,22 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
     def max_temp(self):
         """Return the maximum temperature."""
         return self._convert_for_display(28.0)
+    
+    @property
+    def device_state_attributes(self):
+        """Return the optional state attributes."""
+        attrs = {}
+
+        # no data available to create
+        if not self.available:
+            return attrs
+                
+        # Generate an attributes list
+        for node, data in HM_ATTRIBUTE_SUPPORT.items():
+            # Is an attributes and exists for this object
+            if node in self._dict['hkr']:
+                value = data[1].get(int(self._dict['hkr'][node]), str(self._dict['hkr'][node]))
+                attrs[data[0]] = value
+ 
+        return attrs
     
