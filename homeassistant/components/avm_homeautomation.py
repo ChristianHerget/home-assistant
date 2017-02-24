@@ -123,7 +123,7 @@ def async_setup(hass, config):
     # Log into FRITZ!Box
     while True: 
         try:
-            yield from fbc.new_session()
+            yield from fbc.async_new_session()
         except Exception as e:
             _LOGGER.warning("Couldn't log into FRITZ!Box: %s" % str(e))
             # Wait 10 seconds
@@ -157,23 +157,37 @@ class pyFBC(object):
         self._host        = host
         self._user        = user
         self._password    = password
-        self._aha_sid     = None
-        self._rights      = None        
+        
+        self._sid         = None
+        self._rights      = None       
+        self._blocktime   = 0 
         
         self.URL_LOGIN  = "http://{}/login_sid.lua"
         self.URL_SWITCH = "http://{}/webservices/homeautoswitch.lua"
         
         return
+    
+    @property
+    def user_rights(self):
+        return self._rights
+    
+    @property
+    def sid(self):
+        return self._sid
+    
+    @property
+    def blocktime(self):
+        return self._blocktime
             
     @asyncio.coroutine
-    def new_session(self):
+    def async_new_session(self):
         """Establish a new session."""
         from aiohttp.web_exceptions import HTTPForbidden
         from xml.etree.ElementTree import fromstring
         import xmltodict
         from hashlib import md5
         
-        res = yield from self._fetch_string(self.URL_LOGIN.format(self._host))
+        res = yield from self.async_fetch_string(self.URL_LOGIN.format(self._host))
         dom = fromstring(res)
         sid = dom.findtext('./SID')
         challenge = dom.findtext('./Challenge')
@@ -187,36 +201,35 @@ class pyFBC(object):
             
             params = {'username': self._user,'response': response}
             
-            res = yield from self._fetch_string(self.URL_LOGIN.format(self._host), params=params)
+            res = yield from self.async_fetch_string(self.URL_LOGIN.format(self._host), params=params)
             dom = fromstring(res)
             sid = dom.findtext('./SID')
             
             from xml.etree import ElementTree as ET
             temp = xmltodict.parse( ET.tostring( dom.find("Rights") ) )
-            self._rights = temp['Rights']
-            
-            #print(dumps(self._rights, indent=4))
+            self._rights    = temp['Rights']
             
         if sid == '0000000000000000':
+            self._blocktime = temp['BlockTime']
             raise HTTPForbidden() # 403
         
-        self._aha_sid = sid
+        self._sid = sid
         
         return True
     
     @asyncio.coroutine
     def async_close_session(self):
         """Close the session login."""
-        if self._aha_sid is None:
+        if self._sid is None:
             return
         else:
-            yield from self._fetch_string(self.URL_LOGIN.format(self._host), {'sid': self._aha_sid, 'logout':''})
+            yield from self.async_fetch_string(self.URL_LOGIN.format(self._host), {'sid': self._sid, 'logout':''})
         self._aio_session
         self._sha_sid = None
         
         
     @asyncio.coroutine
-    def _execute(self, url, params=None):
+    def async_execute(self, url, params=None):
         """Fetch file for requests."""
         import async_timeout
         
@@ -225,12 +238,12 @@ class pyFBC(object):
             return res
         
     @asyncio.coroutine
-    def _fetch_string(self, url, params=None):
+    def async_fetch_string(self, url, params=None):
         """Fetch string for requests."""
         from aiohttp.web_exceptions import (
             HTTPBadRequest, HTTPForbidden, HTTPInternalServerError)
         
-        res = yield from self._execute(url, params)
+        res = yield from self.async_execute(url, params)
         status = res.status
         
         if status == 200:
@@ -243,10 +256,10 @@ class pyFBC(object):
             yield from res.release()
             _LOGGER.debug("Status '%s' Forbidden, try to reconnect" % status)
             try:
-                if (yield from self.new_session()) == True:
+                if (yield from self.async_new_session()) == True:
                     if 'sid' in params:
-                        params['sid'] = self._aha_sid
-                    return (yield from self._fetch_string(url, params))
+                        params['sid'] = self._sid
+                    return (yield from self.async_fetch_string(url, params))
             except Exception:
                 raise HTTPForbidden()
         elif status == 500:
@@ -261,14 +274,14 @@ class pyFBC(object):
         return 'Inval'
     
     @asyncio.coroutine
-    def send_switch_command(self, params, ain=None):
+    def async_send_switch_command(self, params, ain=None):
         if params == None:
             params = {}
         
-        if self._aha_sid == None:
+        if self._sid == None:
             raise Exception
         else:
-            params.update({'sid': self._aha_sid})
+            params.update({'sid': self._sid})
         
         if ain != None:
             params.update({'ain': ain})
@@ -276,17 +289,17 @@ class pyFBC(object):
         url = self.URL_SWITCH.format(str(self._host))
         
         try:
-            res = yield from self._fetch_string(url, params=params)
+            res = yield from self.async_fetch_string(url, params=params)
         except Exception as e:
             raise e
         else:
             return res
     
     @asyncio.coroutine
-    def get_device_xml_as_string(self):
+    def async_get_device_xml_as_string(self):
         from xml.etree.ElementTree import fromstring
         try:
-            __devices = yield from self.send_switch_command({"switchcmd": "getdevicelistinfos"})
+            __devices = yield from self.async_send_switch_command({"switchcmd": "getdevicelistinfos"})
         except Exception as e:
             raise e
             return None
@@ -347,7 +360,7 @@ class AvmHomeAutomationBase(object):
     def async_get_devices_xml(self):
         from xml.etree import ElementTree as ET
         try:
-            devices = yield from self._fbc.send_switch_command({"switchcmd": "getdevicelistinfos"}) 
+            devices = yield from self._fbc.async_send_switch_command({"switchcmd": "getdevicelistinfos"}) 
         except Exception as e:
             _LOGGER.error("Login to FRITZ!Box failed: %s" % str(e))
             return
@@ -374,7 +387,7 @@ class AvmHomeAutomationBase(object):
     def async_send_switch_command(self, params, ain=None):
         # Forwards switch commands
         try:
-            return self._fbc.send_switch_command(params, ain)
+            return self._fbc.async_send_switch_command(params, ain)
         except Exception as e:
             raise e
     
