@@ -82,26 +82,7 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
     def unit_of_measurement(self):
         """The unit of measurement to display."""
         return self.hass.config.units.temperature_unit
-    
-#     @property
-#     def device_state_attributes(self):
-#         """Return the state attributes of the device."""
-#         attrs = {}
-#         
-#         if self.available == True:
-#             attrs[ATTR_CURRENT_TEMPERATURE] = self.current_temperature
-#         else:
-#             attrs[ATTR_CURRENT_TEMPERATURE] = STATE_UNKNOWN
-#         
-#         attrs[ATTR_TEMPERATURE]      = self.target_temperature
-#         attrs[ATTR_TARGET_TEMP_HIGH] = self.target_temperature_high
-#         attrs[ATTR_TARGET_TEMP_LOW]  = self.target_temperature_low
-#         attrs[ATTR_OPERATION_MODE]   = self.current_operation
-#         attrs[ATTR_MAX_TEMP]         = self.max_temp
-#         attrs[ATTR_MIN_TEMP]         = self.min_temp
-# 
-#         return attrs
-            
+                
     @property
     def state(self) -> str:
         """Return the state of the entity."""
