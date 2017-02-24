@@ -1,14 +1,12 @@
-'''
-Created on 16.02.2017
+"""
+Support for FRITZ!DECT devices (AVM Home Automation).
 
-@author: Christian
-'''
+For more details about this component, please refer to the documentation at
+https://home-assistant.io/components/avm_homeautomation/
+"""
 
 import logging
 import asyncio
-
-import xmltodict
-from json import dumps
 
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
@@ -17,40 +15,34 @@ from datetime import timedelta
 from typing import Optional
 
 from homeassistant.const import (
-    EVENT_HOMEASSISTANT_STOP, CONF_USERNAME, CONF_PASSWORD, 
+    EVENT_HOMEASSISTANT_STOP, CONF_USERNAME, CONF_PASSWORD,
     CONF_HOST, ATTR_ENTITY_ID, TEMP_CELSIUS, CONF_SCAN_INTERVAL)
-from homeassistant.helpers import discovery
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
-from homeassistant.const import (
-    EVENT_HOMEASSISTANT_STOP, CONF_USERNAME, CONF_PASSWORD, 
-    CONF_HOST, ATTR_ENTITY_ID, TEMP_CELSIUS)
 from homeassistant.helpers import discovery
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 DOMAIN = 'avm_homeautomation'
 REQUIREMENTS = ['xmltodict==0.10.2']
 
-
 DISCOVER_SWITCHES = DOMAIN + '.switch'
-DISCOVER_CLIMATE  = DOMAIN + '.climate'
+DISCOVER_CLIMATE = DOMAIN + '.climate'
 
-ATTR_DISCOVER_DEVICES   = 'devices'
+ATTR_DISCOVER_DEVICES = 'devices'
 
 DATA_AVM_HOMEAUTOMATION = 'data' + DOMAIN
 
 # Standard FRITZ!Box IP
 DEFAULT_HOST = 'fritz.box'
-# Default FRITZ!Box User Name, this isn't important as FRITZ!Box uses no username by default
+# Default FRITZ!Box User Name, this isn't important as FRITZ!Box uses no user name by default
 DEFAULT_USERNAME = ''
 # Default Update Interval
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
-        vol.Optional(CONF_HOST,          default=DEFAULT_HOST):     cv.string,
-        vol.Optional(CONF_USERNAME,      default=DEFAULT_USERNAME): cv.string,
+        vol.Optional(CONF_HOST, default=DEFAULT_HOST):     cv.string,
+        vol.Optional(CONF_USERNAME, default=DEFAULT_USERNAME): cv.string,
         vol.Required(CONF_PASSWORD):                                cv.string,
         vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): 
             vol.All(vol.Coerce(int), vol.Range(min=1)),
@@ -107,11 +99,11 @@ SCHEMA_DICT_DEVICE = vol.Schema({
             vol.Required('private_updated'):  cv.boolean,
         }, extra=vol.ALLOW_EXTRA)
 
-BIT_MASK_THERMOSTAT    = (1 <<  6)
-BIT_MASK_POWERMETER    = (1 <<  7)
-BIT_MASK_TEMPERATURE   = (1 <<  8)
-BIT_MASK_SWITCH        = (1 <<  9)
-BIT_MASK_REPEATER      = (1 << 10)
+BIT_MASK_THERMOSTAT = (1 << 6)
+BIT_MASK_POWERMETER = (1 << 7)
+BIT_MASK_TEMPERATURE = (1 << 8)
+BIT_MASK_SWITCH = (1 << 9)
+BIT_MASK_REPEATER = (1 << 10)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -119,7 +111,7 @@ _LOGGER = logging.getLogger(__name__)
 def async_setup(hass, config):
     """Setup the avm_smarthome component."""
     
-    host     = config[DOMAIN].get(CONF_HOST)
+    host = config[DOMAIN].get(CONF_HOST)
     username = config[DOMAIN].get(CONF_USERNAME)
     password = config[DOMAIN].get(CONF_PASSWORD)
     interval = config[DOMAIN].get(CONF_SCAN_INTERVAL)
@@ -150,11 +142,12 @@ def async_setup(hass, config):
     # Schedule periodic device update
     async_track_time_interval(hass, ahab.async_update_device_dicts, interval)
     
-    # Ensure we logout on shutdown
     @asyncio.coroutine
     def async_shutdown(call):
+        """Ensure we logout on shutdown"""
         fbc.async_close_session()
     
+    #Ensure we logout on shutdown
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_shutdown)
     
     return True
@@ -164,15 +157,15 @@ class pyFBC(object):
     
     def __init__(self, session, host, user, password):
         self._aio_session = session
-        self._host        = host
-        self._user        = user
-        self._password    = password
+        self._host = host
+        self._user = user
+        self._password = password
         
-        self._sid         = None
-        self._rights      = None       
-        self._blocktime   = 0 
+        self._sid = None
+        self._rights = None       
+        self._blocktime = 0 
         
-        self.URL_LOGIN  = "http://{}/login_sid.lua"
+        self.URL_LOGIN = "http://{}/login_sid.lua"
         self.URL_SWITCH = "http://{}/webservices/homeautoswitch.lua"
         
         return
@@ -190,7 +183,7 @@ class pyFBC(object):
         return self._blocktime
             
     @asyncio.coroutine
-    def async_new_session(self):
+    def async_new_session(self) -> bool:
         """Establish a new session."""
         from aiohttp.web_exceptions import HTTPForbidden
         from xml.etree.ElementTree import fromstring
@@ -209,19 +202,19 @@ class pyFBC(object):
             md5_var.update(self._password.encode('utf-16le'))
             response = challenge + '-' + md5_var.hexdigest()
             
-            params = {'username': self._user,'response': response}
+            params = {'username': self._user, 'response': response}
             
             res = yield from self.async_fetch_string(self.URL_LOGIN.format(self._host), params=params)
             dom = fromstring(res)
             sid = dom.findtext('./SID')
             
             from xml.etree import ElementTree as ET
-            temp = xmltodict.parse( ET.tostring( dom.find("Rights") ) )
-            self._rights    = temp['Rights']
+            temp = xmltodict.parse(ET.tostring(dom.find("Rights")))
+            self._rights = temp['Rights']
             
         if sid == '0000000000000000':
             self._blocktime = temp['BlockTime']
-            raise HTTPForbidden() # 403
+            raise HTTPForbidden()  # 403
         
         self._sid = sid
         
@@ -234,7 +227,7 @@ class pyFBC(object):
             return
         else:
             yield from self.async_fetch_string(self.URL_LOGIN.format(self._host), {'sid': self._sid, 'logout':''})
-        self._aio_session
+        self._aio_session = None
         self._sha_sid = None
         
     @asyncio.coroutine
@@ -247,7 +240,7 @@ class pyFBC(object):
             return res
         
     @asyncio.coroutine
-    def async_fetch_string(self, url, params=None):
+    def async_fetch_string(self, url, params=None) -> str:
         """Fetch string for requests."""
         from aiohttp.web_exceptions import (
             HTTPBadRequest, HTTPForbidden, HTTPInternalServerError)
@@ -280,10 +273,11 @@ class pyFBC(object):
             _LOGGER.error("Status '%s' Unknown" % status)
             raise Exception
         
-        return 'Inval'
+        return None
     
     @asyncio.coroutine
-    def async_send_switch_command(self, params, ain=None):
+    def async_send_switch_command(self, params, ain=None) -> str:
+        """Send command to FRITZ!Box via homeautoswitch.lua"""
         if params == None:
             params = {}
         
@@ -305,7 +299,8 @@ class pyFBC(object):
             return res
     
     @asyncio.coroutine
-    def async_get_device_xml_as_string(self):
+    def async_get_device_xml_as_string(self) -> str:
+        """Get the XML file with the device states from FRITZ!Box"""
         from xml.etree.ElementTree import fromstring
         try:
             __devices = yield from self.async_send_switch_command({"switchcmd": "getdevicelistinfos"})
@@ -316,6 +311,7 @@ class pyFBC(object):
             dom = fromstring(__devices)
             return dom
 
+
 class AvmHomeAutomationBase(object):
     """AvmHomeAutomationBase"""
     
@@ -323,21 +319,18 @@ class AvmHomeAutomationBase(object):
         if DATA_AVM_HOMEAUTOMATION not in hass.data:
             hass.data[DATA_AVM_HOMEAUTOMATION] = {}
             
-        self._hass   = hass
+        self._hass = hass
         self._config = config
-        self._fbc    = fbc
+        self._fbc = fbc
                         
         self._devices_xml = None
         # Devices are stored as {ain: {bitmask: functionbitmask, dict: Dictionary, instance: object}, ...}
-        ## todo: remove bitmask, as it is in dict
+        # # todo: remove bitmask, as it is in dict
         self._devices = {}
         
         hass.data[DATA_AVM_HOMEAUTOMATION][DOMAIN] = self
 
         return
-    
-    def __del__(self):
-        pass#self._conn.close()
                     
     @asyncio.coroutine
     def async_update_device_dicts(self, event):
@@ -387,16 +380,21 @@ class AvmHomeAutomationBase(object):
         for device_xml in self._devices_xml.findall("device"):
             devices.update({device_xml.attrib['identifier']: {'bitmask': device_xml.attrib['functionbitmask'], 'dict': None, 'instance': None}})
             
-        #for device_xml in devices_xml.findall("group"):
+        for ain in devices.keys():
+            __dict = self._create_device_dict(ain)
+            if __dict:
+                devices[ain]['dict'] = __dict
+            
+        # for device_xml in devices_xml.findall("group"):
         #    devices.update({device_xml.attrib['identifier']: None})
             
         return devices
     
     @asyncio.coroutine
-    def async_send_switch_command(self, params, ain=None):
+    def async_send_switch_command(self, params, ain=None) -> str:
         # Forwards switch commands
         try:
-            return self._fbc.async_send_switch_command(params, ain)
+            return (yield from self._fbc.async_send_switch_command(params, ain))
         except Exception as e:
             raise e
     
@@ -416,12 +414,11 @@ class AvmHomeAutomationBase(object):
                 _LOGGER.error("'%s' has no device dictionary" % ain)
             else:
                 self._devices[ain]['private_updated'] = False
-                #_LOGGER.debug(dumps(dict, indent=4))
+                # _LOGGER.debug(dumps(dict, indent=4))
                 return __dict
         else:
             _LOGGER.error("'%s' not in Device List" % ain)
-            
-        return None
+            return None
         
     def update_devices(self, new_device_list):
         """Compares new device list to current device list, adds and Removes devices"""
@@ -461,9 +458,8 @@ class AvmHomeAutomationBase(object):
             if found_device_list:
                 # Fire discovery event
                 __ain_list = [k for k in found_device_list.keys()]
-                _LOGGER.debug( "Component '%s' going to add actors '%s'" % ( component_name, ', '.join(__ain_list)) )
+                _LOGGER.debug("Component '%s' going to add actors '%s'" % (component_name, ', '.join(__ain_list)))
                 discovery.load_platform(self._hass, component_name, DOMAIN, {ATTR_DISCOVER_DEVICES: __ain_list}, self._config)
-                
         return
     
     def _create_device_dict(self, __ain):
@@ -471,7 +467,7 @@ class AvmHomeAutomationBase(object):
         import xmltodict
         __device_xml = self.get_device_xml(__ain)
             
-        temp = xmltodict.parse( ET.tostring( __device_xml ) )
+        temp = xmltodict.parse(ET.tostring(__device_xml))
         temp['device']['private_updated'] = True
         
         try:
@@ -488,15 +484,14 @@ class AvmHomeAutomationBase(object):
         for __ain, __value in device_list.items():
             __bitmask = __value['bitmask']
             if discovery_type == DISCOVER_SWITCHES:
-                if bool( (int(__bitmask) & BIT_MASK_SWITCH) == BIT_MASK_SWITCH ) == True:
+                if bool((int(__bitmask) & BIT_MASK_SWITCH) == BIT_MASK_SWITCH) == True:
                     __new_device_list.update({__ain: __value})
             elif discovery_type == DISCOVER_CLIMATE:
-                if bool( (int(__bitmask) & BIT_MASK_THERMOSTAT) == BIT_MASK_THERMOSTAT ) == True:
+                if bool((int(__bitmask) & BIT_MASK_THERMOSTAT) == BIT_MASK_THERMOSTAT) == True:
                     __new_device_list.update({__ain: __value})
                     
         return __new_device_list
 
-from typing import Optional
 
 class AvmHomeAutomationDevice(Entity):
     """An abstract class for a AvmHomeAutomationDevice entity."""
@@ -507,35 +502,18 @@ class AvmHomeAutomationDevice(Entity):
         self._aha = aha
         self._ain = ain
         
-        self._dict = None
-        self.update_dict()
+        self._dict = aha._devices[ain]['dict']
+        #self.update_dict()
         
         self.units = hass.config.units
         
         aha._devices[ain]['instance'] = self
         
-        #from json import dumps
-        #_LOGGER.debug(dumps(self._dict, indent=4))
+        # from json import dumps
+        # _LOGGER.debug(dumps(self._dict, indent=4))
                 
         return
-    
-    def update_dict(self):
-        """" Get a new dict from the AvmHomeAutomationBase """
-        __dict = self._aha.get_device_dict(self._ain)
         
-        if __dict['private_updated'] == True:
-            try:
-                self._validate_schema(__dict)
-            except vol.MultipleInvalid as e:
-                _LOGGER.error("Schema validation failed: %s" % str(e))
-            else:
-                self._dict = __dict
-                self._assumed_state = False
-        else:
-            # Device dict seems to be somewaht out of date
-            self._assumed_state = True                    
-        return
-    
     def async_update_dict(self):
         """" Get a new dict from the AvmHomeAutomationBase """
         __dict = self._aha.get_device_dict(self._ain)
@@ -556,7 +534,7 @@ class AvmHomeAutomationDevice(Entity):
     def _validate_schema(self, value):
         SCHEMA_DICT_DEVICE(value)
 
-    ## Import from Entity
+    # # Import from Entity
     @property
     def should_poll(self) -> bool:
         """Return True if entity has to be polled for state.
@@ -624,11 +602,11 @@ class AvmHomeAutomationDevice(Entity):
         """
         Retrieve latest state.
         """
-        #self.update_dict()
+        # self.update_dict()
         
         return
     
-    ## Import from Climate (not in the parent list)
+    # # Import from Climate (not in the parent list)
     @property
     def current_temperature(self):
         """Return the current _temperature."""

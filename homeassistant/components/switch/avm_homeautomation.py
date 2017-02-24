@@ -62,7 +62,6 @@ VAL_SCHEMA_DICT_SWITCH = vol.Schema({
             vol.Required('powermeter'):       SCHEMA_DICT_POWERMETER,
             vol.Optional('temperature'):      SCHEMA_DICT_TEMPERATURE,
             vol.Remove('hkr'):                SCHEMA_DICT_HKR,
-            vol.Required('private_updated'):  cv.boolean,
         }, extra=vol.ALLOW_EXTRA)
 
 HM_ATTRIBUTE_SUPPORT = {
@@ -107,7 +106,7 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
     @property
     def assumed_state(self) -> bool:
         """Return True if unable to access real state of the entity."""
-        return self._assumed_state
+        return False
     
     @property
     def device_state_attributes(self):
