@@ -6,10 +6,7 @@ Created on 16.02.2017
 
 import asyncio
 import logging
-<<<<<<< HEAD
 
-=======
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 
