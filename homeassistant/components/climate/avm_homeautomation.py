@@ -6,17 +6,34 @@ Created on 16.02.2017
 
 import asyncio
 import logging
+<<<<<<< HEAD
 
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 
 from homeassistant.components.climate import (STATE_AUTO, STATE_OFF, STATE_ON, ClimateDevice)
 from homeassistant.const import (ATTR_TEMPERATURE, TEMP_CELSIUS, STATE_UNKNOWN)
+=======
+import voluptuous as vol
+import homeassistant.helpers.config_validation as cv
+
+from datetime import timedelta
+
+from homeassistant.components.climate import (STATE_AUTO, STATE_OFF, STATE_ON, ClimateDevice)
+
+from homeassistant.const import (ATTR_TEMPERATURE, TEMP_CELSIUS, STATE_UNKNOWN)
+
+>>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
 from homeassistant.components.avm_homeautomation import (
     ATTR_DISCOVER_DEVICES, DATA_AVM_HOMEAUTOMATION, DOMAIN,
     AvmHomeAutomationDevice, SCHEMA_DICT_SWITCH, SCHEMA_DICT_POWERMETER,
     SCHEMA_DICT_TEMPERATURE, SCHEMA_DICT_HKR)
 
+<<<<<<< HEAD
+=======
+SCAN_INTERVAL = timedelta(minutes=1)
+
+>>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
 _LOGGER = logging.getLogger(__name__)
 
 DEPENDENCIES = ['avm_homeautomation']
