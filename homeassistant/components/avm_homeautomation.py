@@ -6,8 +6,7 @@ Created on 16.02.2017
 
 import logging
 import asyncio
-import xmltodict
-from json import dumps
+#from json import dumps
 
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
@@ -163,6 +162,7 @@ class pyFBC(object):
     def new_session(self):
         """Establish a new session."""
         from xml.etree.ElementTree import fromstring
+        import xmltodict
         from hashlib import md5
         
         res = yield from self._fetch_string(self.URL_LOGIN.format(self._host))
@@ -434,9 +434,10 @@ class AvmHomeAutomationBase(object):
         return
     
     def _create_device_dict(self, __ain):
+        from xml.etree import ElementTree as ET
+        import xmltodict
         __device_xml = self.get_device_xml(__ain)
             
-        from xml.etree import ElementTree as ET
         temp = xmltodict.parse( ET.tostring( __device_xml ) )
         temp['device']['private_updated'] = True
         
