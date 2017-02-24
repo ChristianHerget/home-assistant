@@ -6,17 +6,14 @@ Created on 16.02.2017
 
 import logging
 import asyncio
-<<<<<<< HEAD
-=======
+
 import xmltodict
 from json import dumps
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
 
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 
 from datetime import timedelta
-<<<<<<< HEAD
 from typing import Optional
 
 from homeassistant.const import (
@@ -24,38 +21,27 @@ from homeassistant.const import (
     CONF_HOST, ATTR_ENTITY_ID, TEMP_CELSIUS, CONF_SCAN_INTERVAL)
 from homeassistant.helpers import discovery
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-=======
 
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP, CONF_USERNAME, CONF_PASSWORD, 
     CONF_HOST, ATTR_ENTITY_ID, TEMP_CELSIUS)
 from homeassistant.helpers import discovery
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
 
 DOMAIN = 'avm_homeautomation'
 REQUIREMENTS = ['xmltodict==0.10.2']
 
-<<<<<<< HEAD
+
 DISCOVER_SWITCHES = DOMAIN + '.switch'
 DISCOVER_CLIMATE  = DOMAIN + '.climate'
 
 ATTR_DISCOVER_DEVICES   = 'devices'
-=======
-SCAN_INTERVAL_VARIABLES = timedelta(seconds=15)
 
-DISCOVER_SWITCHES = DOMAIN + '.switch'
-DISCOVER_CLIMATE = DOMAIN + '.climate'
-
-ATTR_DISCOVER_DEVICES = 'devices'
-
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
 DATA_AVM_HOMEAUTOMATION = 'data' + DOMAIN
 
 # Standard FRITZ!Box IP
 DEFAULT_HOST = 'fritz.box'
-<<<<<<< HEAD
 # Default FRITZ!Box User Name, this isn't important as FRITZ!Box uses no username by default
 DEFAULT_USERNAME = ''
 # Default Update Interval
@@ -71,20 +57,6 @@ CONFIG_SCHEMA = vol.Schema({
     }),
 }, extra=vol.ALLOW_EXTRA)
 
-=======
-# Standard FRITZ!Box User Name
-DEFAULT_USERNAME = 'admin'
-
-CONFIG_SCHEMA = vol.Schema({
-    DOMAIN: vol.Schema({
-        vol.Required(CONF_HOST, default=DEFAULT_HOST): cv.string,
-        vol.Optional(CONF_USERNAME, default=DEFAULT_USERNAME): cv.string,
-        vol.Optional(CONF_PASSWORD): cv.string,
-    }),
-}, extra=vol.ALLOW_EXTRA)
-
-
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
 SCHEMA_DICT_TEMPERATURE = {
                 vol.Required('celsius'): vol.Any(None, vol.Coerce(int)),
                 vol.Required('offset'): vol.Any(None, vol.Coerce(int)),
@@ -146,33 +118,19 @@ _LOGGER = logging.getLogger(__name__)
 @asyncio.coroutine
 def async_setup(hass, config):
     """Setup the avm_smarthome component."""
-<<<<<<< HEAD
-=======
-    import aiohttp
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
     
     host     = config[DOMAIN].get(CONF_HOST)
     username = config[DOMAIN].get(CONF_USERNAME)
     password = config[DOMAIN].get(CONF_PASSWORD)
-<<<<<<< HEAD
     interval = config[DOMAIN].get(CONF_SCAN_INTERVAL)
         
     # Get aiohttp session
     session = async_get_clientsession(hass)
-=======
-    interval = config.get(SCAN_INTERVAL_VARIABLES) or timedelta(seconds=30)
-    
-    _LOGGER.debug("Host: %s Username: %s Password: %s ", host, username, password)
-    
-    # Create async http session
-    session = aiohttp.ClientSession(loop=hass.loop)
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
     
     # Create pyFBC to communicate with the FRITZ!Box
     fbc = pyFBC(session, host, username, password)
     
     # Log into FRITZ!Box
-<<<<<<< HEAD
     while True: 
         try:
             yield from fbc.new_session()
@@ -200,21 +158,6 @@ def async_setup(hass, config):
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_shutdown)
     
     return True
-=======
-    if (yield from fbc.new_session()) == True:
-        # If login succeeded
-        ahab = AvmHomeAutomationBase(hass, config, fbc)
-        # Get initial device list from FRITZ!Box
-        new_devices = yield from ahab.async_get_devices_from_xml()
-        # Add new devices to list and call platform(s)
-        ahab.update_devices(new_devices)
-        # Schedule periodic device update
-        async_track_time_interval(hass, ahab.async_update_device_dicts, interval)
-        
-        return True
-    
-    return False
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
 
 class pyFBC(object):
     """Python FRITZ!Box Connect"""
@@ -231,7 +174,6 @@ class pyFBC(object):
         self.URL_SWITCH = "http://{}/webservices/homeautoswitch.lua"
         
         return
-<<<<<<< HEAD
             
     @asyncio.coroutine
     def new_session(self):
@@ -239,16 +181,6 @@ class pyFBC(object):
         from aiohttp.web_exceptions import HTTPForbidden
         from xml.etree.ElementTree import fromstring
         import xmltodict
-=======
-    
-    def __del__(self):
-        self.close_session()
-        
-    @asyncio.coroutine
-    def new_session(self):
-        """Establish a new session."""
-        from xml.etree.ElementTree import fromstring
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
         from hashlib import md5
         
         res = yield from self._fetch_string(self.URL_LOGIN.format(self._host))
@@ -276,22 +208,14 @@ class pyFBC(object):
             #print(dumps(self._rights, indent=4))
             
         if sid == '0000000000000000':
-<<<<<<< HEAD
             raise HTTPForbidden() # 403
-=======
-            raise BaseException('access denied')
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
         
         self._aha_sid = sid
         
         return True
     
     @asyncio.coroutine
-<<<<<<< HEAD
     def async_close_session(self):
-=======
-    def close_session(self):
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
         """Close the session login."""
         if self._aha_sid is None:
             return
@@ -299,7 +223,6 @@ class pyFBC(object):
             yield from self._fetch_string(self.URL_LOGIN.format(self._host), {'sid': self._aha_sid, 'logout':''})
         self._aio_session
         self._sha_sid = None
-        
         
     @asyncio.coroutine
     def _execute(self, url, params=None):
@@ -313,15 +236,10 @@ class pyFBC(object):
     @asyncio.coroutine
     def _fetch_string(self, url, params=None):
         """Fetch string for requests."""
-<<<<<<< HEAD
         from aiohttp.web_exceptions import (
             HTTPBadRequest, HTTPForbidden, HTTPInternalServerError)
         
         res = yield from self._execute(url, params)
-=======
-        res = yield from self._execute(url, params)
-
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
         status = res.status
         
         if status == 200:
@@ -329,10 +247,7 @@ class pyFBC(object):
             return string.strip()
         elif status == 400:
             _LOGGER.error("Status '%s' Bad Request" % status)
-<<<<<<< HEAD
             raise HTTPBadRequest()
-=======
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
         elif status == 403:
             yield from res.release()
             _LOGGER.debug("Status '%s' Forbidden, try to reconnect" % status)
@@ -341,30 +256,18 @@ class pyFBC(object):
                     if 'sid' in params:
                         params['sid'] = self._aha_sid
                     return (yield from self._fetch_string(url, params))
-<<<<<<< HEAD
             except Exception:
                 raise HTTPForbidden()
         elif status == 500:
             yield from res.release()
             _LOGGER.debug("Status '%s' Internal Server" % status)
             raise HTTPInternalServerError()
-=======
-            except Exception as e:
-                raise e
-        elif status == 500:
-            yield from res.release()
-            _LOGGER.debug("Status '%s' Internal Server" % status)
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
         else:
             yield from res.release()
             _LOGGER.error("Status '%s' Unknown" % status)
             raise Exception
         
         return 'Inval'
-<<<<<<< HEAD
-=======
-
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
     
     @asyncio.coroutine
     def send_switch_command(self, params, ain=None):
@@ -551,16 +454,10 @@ class AvmHomeAutomationBase(object):
         return
     
     def _create_device_dict(self, __ain):
-<<<<<<< HEAD
         from xml.etree import ElementTree as ET
         import xmltodict
         __device_xml = self.get_device_xml(__ain)
             
-=======
-        __device_xml = self.get_device_xml(__ain)
-            
-        from xml.etree import ElementTree as ET
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
         temp = xmltodict.parse( ET.tostring( __device_xml ) )
         temp['device']['private_updated'] = True
         
@@ -585,17 +482,8 @@ class AvmHomeAutomationBase(object):
                     __new_device_list.update({__ain: __value})
                     
         return __new_device_list
-<<<<<<< HEAD
-=======
-    
-        # bool( (__bitmask & BIT_MASK_THERMOSTAT) == BIT_MASK_THERMOSTAT )
-        # bool( (__bitmask & BIT_MASK_POWERMETER) == BIT_MASK_POWERMETER )
-        # bool( (__bitmask & BIT_MASK_TEMPERATURE) == BIT_MASK_TEMPERATURE )
-        # bool( (__bitmask & BIT_MASK_SWITCH) == BIT_MASK_SWITCH )
-        # bool( (__bitmask & BIT_MASK_REPEATER) == BIT_MASK_REPEATER )
 
 from typing import Optional
->>>>>>> 86eb1ebf935324ca9d008d83e44137680c241c72
 
 class AvmHomeAutomationDevice(Entity):
     """An abstract class for a AvmHomeAutomationDevice entity."""
