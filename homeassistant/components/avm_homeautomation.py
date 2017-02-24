@@ -24,6 +24,7 @@ from homeassistant.helpers.event import async_track_time_interval
 DOMAIN = 'avm_homeautomation'
 REQUIREMENTS = ['xmltodict==0.10.2']
 
+#change to default
 SCAN_INTERVAL_VARIABLES = timedelta(seconds=15)
 
 DISCOVER_SWITCHES = DOMAIN + '.switch'
@@ -113,6 +114,7 @@ def async_setup(hass, config):
     host     = config[DOMAIN].get(CONF_HOST)
     username = config[DOMAIN].get(CONF_USERNAME)
     password = config[DOMAIN].get(CONF_PASSWORD)
+    #todo change to propper conf
     interval = config.get(SCAN_INTERVAL_VARIABLES) or timedelta(seconds=30)
     
     _LOGGER.debug("Host: %s Username: %s Password: %s ", host, username, password)
