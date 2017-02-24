@@ -1,8 +1,9 @@
-'''
-Created on 16.02.2017
+"""
+Support for FRITZ!DECT switches.
 
-@author: Christian
-'''
+For more details about this component, please refer to the documentation at
+https://home-assistant.io/components/switch.avm_homeautomation/
+"""
 
 import asyncio
 import logging
@@ -80,6 +81,7 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
     """Representation of a FRITZ!DECT switch."""
 
     def _validate_schema(self, value):
+        """Used to validate the Schema of the dict"""
         VAL_SCHEMA_DICT_SWITCH(value)
 
     @property

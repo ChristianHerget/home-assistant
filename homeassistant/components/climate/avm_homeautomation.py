@@ -1,8 +1,9 @@
-'''
-Created on 16.02.2017
+"""
+Support for FRITZ!DECT thermostats (300 and Comet DECT).
 
-@author: Christian
-'''
+For more details about this component, please refer to the documentation at
+https://home-assistant.io/components/climate.avm_homeautomation/
+"""
 
 import asyncio
 import logging
@@ -82,6 +83,7 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
     """Representation of a AVM Thermostat."""
 
     def _validate_schema(self, value):
+        """Used to validate the Schema of the dict"""
         SCHEMA_DICT_CLIMATE(value)
 
     @property
@@ -127,6 +129,7 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
 
     @property
     def target_temperature(self) -> float:
+        """Return the temperature we try to reach."""
         __target = int(self._dict['hkr']['tsoll'])
 
         if __target == 253:
@@ -138,11 +141,13 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
 
     @property
     def target_temperature_high(self) -> float:
+        """Return the highbound target temperature we try to reach."""
         return self._convert_for_display(
             float(int(self._dict['hkr']['komfort'])) / 2.0)
 
     @property
     def target_temperature_low(self) -> float:
+        """Return the lowbound target temperature we try to reach."""
         return self._convert_for_display(
             float(int(self._dict['hkr']['absenk'])) / 2.0)
 
