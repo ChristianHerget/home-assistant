@@ -217,4 +217,4 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
                 attrs[data[0]] = value
  
         return attrs
-    
+
