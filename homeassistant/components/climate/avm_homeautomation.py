@@ -36,10 +36,10 @@ def async_setup_platform(hass, config, async_add_entities,
 
         for __ain in __ains:
             __aha = hass.data[DATA_AVM_HOMEAUTOMATION][DOMAIN]
-            _LOGGER.debug("Adding device '%s'" % __ain)
+            _LOGGER.debug("Adding device '%s'", __ain)
             yield from async_add_entities(
                 [AvmThermostat(hass, __ain, __aha)],
-                update_before_add=True)
+                update_before_add=False)
 
     return
 
@@ -154,11 +154,18 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
     @asyncio.coroutine
     def async_set_temperature(self, **kwargs):
         """Set new target _temperature."""
-        temperature = kwargs.get(ATTR_TEMPERATURE)
-        temperature = int(temperature * 2.0)
-        yield from self._aha.async_send_switch_command(
-            {'switchcmd': 'sethkrtsoll', 'param': str(temperature)}, self._ain)
-        self._dict['hkr']['tsoll'] = temperature
+        temperature = float(kwargs.get(ATTR_TEMPERATURE))
+
+        if self.min_temp <= temperature <= self.max_temp:
+            temperature = int(temperature * 2.0)
+
+            yield from self._aha.async_send_switch_command(
+                {'switchcmd': 'sethkrtsoll', 'param': str(temperature)},
+                self._ain
+                )
+
+            self._dict['hkr']['tsoll'] = temperature
+            self.schedule_update_ha_state()
         return
 
     @asyncio.coroutine
@@ -174,9 +181,12 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
             return
 
         yield from self._aha.async_send_switch_command(
-            {'switchcmd': 'sethkrtsoll', 'param': str(temperature)}, self._ain)
-        self._dict['hkr']['tsoll'] = temperature
+            {'switchcmd': 'sethkrtsoll', 'param': str(temperature)},
+            self._ain
+            )
 
+        self._dict['hkr']['tsoll'] = temperature
+        self.schedule_update_ha_state()
         return
 
     @property

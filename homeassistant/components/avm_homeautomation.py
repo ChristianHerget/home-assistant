@@ -125,23 +125,26 @@ def async_setup(hass, config):
         try:
             yield from fbc.async_new_session()
         except Exception as e:
-            _LOGGER.warning("Couldn't log into FRITZ!Box: %s" % str(e))
+            _LOGGER.warning("Couldn't log into FRITZ!Box: %s", str(e))
             # Wait 10 seconds
-            yield from asyncio.sleep(60, loop=hass.loop)
+            yield from asyncio.sleep(timedelta(seconds=fbc.blocktime + 10),
+                                     loop=hass.loop)
         else:
             break
     # If login succeeded
     ahab = AvmHomeAutomationBase(hass, config, fbc)
-    # Get initial device list from FRITZ!Box
-    new_devices = yield from ahab.async_get_devices_from_xml()
-    # Add new devices to list and call platform(s)
-    ahab.update_devices(new_devices)
+
+    # Add FRITZ!DECT Actuators
+    yield from ahab.async_update_fritz_actuator_dicts(None)
+
     # Schedule periodic device update
-    async_track_time_interval(hass, ahab.async_update_device_dicts, interval)
+    async_track_time_interval(hass,
+                              ahab.async_update_fritz_actuator_dicts,
+                              interval)
 
     @asyncio.coroutine
     def async_shutdown(call):
-        """Ensure we logout on shutdown"""
+        """Ensure we logout on shutdown."""
         fbc.async_close_session()
 
     # Ensure we logout on shutdown
@@ -150,7 +153,8 @@ def async_setup(hass, config):
 
 
 class pyFBC(object):
-    """Python FRITZ!Box Connect"""
+    """Python FRITZ!Box Connect."""
+
     def __init__(self, session, host, user, password):
         self._aio_session = session
         self._host = host
@@ -164,16 +168,19 @@ class pyFBC(object):
         return
 
     @property
-    def user_rights(self):
+    def user_rights(self) -> dict:
+        """Retun User Right as reported by FRITZ!Box."""
         return self._rights
 
     @property
-    def sid(self):
+    def sid(self) -> str:
+        """Return Session ID."""
         return self._sid
 
     @property
-    def blocktime(self):
-        return self._blocktime
+    def blocktime(self) -> int:
+        """Return Blocktime, important incase login failed."""
+        return self._blocktime or 60
 
     @asyncio.coroutine
     def async_new_session(self) -> bool:
@@ -191,7 +198,7 @@ class pyFBC(object):
         sid = dom.findtext('./SID')
         challenge = dom.findtext('./Challenge')
 
-        # Excecute teh following only if we havn'T already a valid SID
+        # Excecute the following only if we havn'T already a valid SID
         if sid == '0000000000000000':
             # Calculate MD5 check sum (response)
             md5_var = md5()
@@ -220,7 +227,7 @@ class pyFBC(object):
         return True
 
     @asyncio.coroutine
-    def async_close_session(self):
+    def async_close_session(self) -> None:
         """Close the session login."""
         if self._sid is None:
             return
@@ -230,7 +237,7 @@ class pyFBC(object):
                 {'sid': self._sid, 'logout': ''}
                 )
         self._aio_session = None
-        self._sha_sid = None
+        self._sid = None
 
     @asyncio.coroutine
     def async_execute(self, url, params=None):
@@ -257,7 +264,7 @@ class pyFBC(object):
             yield from res.release()
             _LOGGER.debug("Status '%s' Forbidden, try to reconnect" % status)
             try:
-                if (yield from self.async_new_session()) == True:
+                if (yield from self.async_new_session()):
                     if 'sid' in params:
                         params['sid'] = self._sid
                     return (yield from self.async_fetch_string(url, params))
@@ -275,7 +282,7 @@ class pyFBC(object):
 
     @asyncio.coroutine
     def async_send_switch_command(self, params, ain=None) -> str:
-        """Send command to FRITZ!Box via homeautoswitch.lua"""
+        """Send command to FRITZ!Box via homeautoswitch.lua."""
         if params is None:
             params = {}
         if self._sid is None:
@@ -294,7 +301,7 @@ class pyFBC(object):
 
     @asyncio.coroutine
     def async_get_device_xml_as_string(self) -> str:
-        """Get the XML file with the device states from FRITZ!Box"""
+        """Get the XML file with the device states from FRITZ!Box."""
         from xml.etree.ElementTree import fromstring
         try:
             __devices = yield from self.async_send_switch_command(
@@ -308,74 +315,78 @@ class pyFBC(object):
 
 
 class AvmHomeAutomationBase(object):
-    """AvmHomeAutomationBase"""
+    """AvmHomeAutomationBase."""
+
     def __init__(self, hass, config, fbc):
+        """Initialize Component."""
         if DATA_AVM_HOMEAUTOMATION not in hass.data:
             hass.data[DATA_AVM_HOMEAUTOMATION] = {}
-        self._hass = hass
+        self.hass = hass
         self._config = config
         self._fbc = fbc
-        self._devices_xml = None
+        self._fritz_actuator_dicts_xml = dict()
         # Devices are stored as
-        # {ain: {bitmask: functionbitmask, dict: Dictionary, instance: object}, ...}
+        # {ain: {dict: Dictionary, instance: object}, ...}
         # # todo: remove bitmask, as it is in dict
-        self._devices = {}
+        self._fritz_actuator_dicts_xml = dict()
         hass.data[DATA_AVM_HOMEAUTOMATION][DOMAIN] = self
         return
 
     @asyncio.coroutine
-    def async_update_device_dicts(self, event):
-        """Update all the FRITZ!DECT stuff"""
-        try:
-            self._devices_xml = yield from self.async_get_devices_xml()
-        except Exception as e:
-            _LOGGER.error("async_get_devices_xml failed: %s" % str(e))
-            return
-        else:
-            if self._devices_xml is None:
-                return
-        for __ain in self._devices.keys():
-            new_dict = self._create_device_dict(__ain)
+    def async_update_fritz_actuator_dicts(self, event) -> None:
+        """Update all the FRITZ!DECT state dicts."""
 
-            if new_dict != self._devices[__ain]['dict']:
-                self._devices[__ain]['dict'] = new_dict
-                _LOGGER.debug("Schedule ASYNC Update of '%s'" % __ain)
-                self._devices[__ain]['instance'].schedule_update_ha_state(
-                    force_refresh=False)
+        new_dicts = yield from self.async_get_fritz_actuator_dicts()
+
+        for ain, new_dict in new_dicts.items():
+            if ain in self._fritz_actuator_dicts_xml:
+                if new_dict != self._fritz_actuator_dicts_xml[ain]['dict']:
+                    _LOGGER.debug("Schedule ASYNC Update of '%s'", ain)
+                    self._fritz_actuator_dicts_xml[ain]['dict'] = new_dict
+                    self._fritz_actuator_dicts_xml[ain]['instance'].\
+                        schedule_update_ha_state(force_refresh=False)
+            else:
+                # Create new entry in central actuator dict
+                new_device = {ain: {'dict': new_dict, 'instance': None}}
+                self._fritz_actuator_dicts_xml.update(new_device)
+                self._load_new_device(new_device)
+
+        for ain in self._fritz_actuator_dicts_xml.keys() - new_dicts.keys():
+            _LOGGER.debug("Going to remove: %s", ain)
+            if self._fritz_actuator_dicts_xml[ain]['instance'] is not None:
+                self.hass.add_job(
+                    self._fritz_actuator_dicts_xml[ain]['instance'].
+                    async_remove()
+                    )
+                self._fritz_actuator_dicts_xml.pop(ain, None)
+
         return
 
     @asyncio.coroutine
-    def async_get_devices_xml(self):
-        from xml.etree import ElementTree as ET
+    def async_get_fritz_actuator_dicts(self) -> dict:
+        import xmltodict
         try:
             devices = yield from self._fbc.async_send_switch_command(
                 {"switchcmd": "getdevicelistinfos"})
         except Exception as e:
-            _LOGGER.error("Login to FRITZ!Box failed: %s" % str(e))
+            _LOGGER.error("Login to FRITZ!Box failed: %s", str(e))
             return
-        return ET.fromstring(devices)
+        temp = xmltodict.parse(devices)
+        return_val = dict()
 
-    @asyncio.coroutine
-    def async_get_devices_from_xml(self):
-        # Get all devices, but don't create objects
-        if self._devices_xml is None:
-            self._devices_xml = yield from self.async_get_devices_xml()
-        devices = {}
-        for device_xml in self._devices_xml.findall("device"):
-            devices.update({device_xml.attrib['identifier']: {
-                'bitmask': device_xml.attrib['functionbitmask'],
-                'dict': None,
-                'instance': None}})
-        for ain in devices.keys():
-            __dict = self._create_device_dict(ain)
-            if __dict:
-                devices[ain]['dict'] = __dict
-        # for device_xml in devices_xml.findall("group"):
-        #    devices.update({device_xml.attrib['identifier']: None})
-        return devices
+        if 'devicelist' in temp:
+            for device in temp['devicelist']['device']:
+                if '@identifier' in device:
+                    ain = device['@identifier']
+                    return_val.update({ain: device})
+        # from json import dumps
+        # _LOGGER.debug("async_get_fritz_actuator_dicts %s",
+        #               dumps(return_val, indent=4))
+        return return_val
 
     @asyncio.coroutine
     def async_send_switch_command(self, params, ain=None) -> str:
+        """Send a switch command to the FRITZ!Box."""
         # Forwards switch commands
         try:
             return (
@@ -384,54 +395,13 @@ class AvmHomeAutomationBase(object):
         except Exception as e:
             raise e
 
-    def get_device_xml(self, ain):
-        if self._devices_xml is None:
-            raise Exception
-        else:
-            return self._devices_xml.find("device[@identifier='" + ain + "']")
-
-    def get_device_dict(self, ain):
-        if ain in self._devices.keys():
-            if self._devices[ain]['dict'] == None:
-                self._devices[ain]['dict'] = self._create_device_dict(ain)
-            __dict = self._devices[ain]['dict']
-            if dict is None:
-                _LOGGER.error("'%s' has no device dictionary" % ain)
-            else:
-                self._devices[ain]['private_updated'] = False
-                # _LOGGER.debug(dumps(dict, indent=4))
-                return __dict
-        else:
-            _LOGGER.error("'%s' not in Device List" % ain)
-            return None
-
-    def update_devices(self, new_device_list):
+    def _load_new_device(self, device_list) -> None:
         """
-        Compares new device list to current device list,
-        adds and Removes devices
+        Looks up the different device types and loads the appropriate platform.
         """
-        __added_devices = {}
-        __removed_devices = {}
-        for __ain in new_device_list.keys() - self._devices.keys():
-            __added_devices.update({__ain: new_device_list[__ain]})
-        for __ain in self._devices.keys() - new_device_list.keys():
-            __removed_devices.update({__ain: new_device_list[__ain]})
-        if __added_devices:
-            # Add new devices to central device list (dict)
-            self._devices.update(__added_devices)
-            self._load_devices(__added_devices)
-        if __removed_devices:
-            for __ain, __value in __removed_devices.items():
-                if __value is not None:
-                    if __value['instance'] != None:
-                        __value['instance'].remove()
-                self._devices.pop(__ain, None)
-        return
-
-    def _load_devices(self, device_list):
         for component_name, discovery_type in (
-            ('switch', DISCOVER_SWITCHES),
-            ('climate', DISCOVER_CLIMATE)
+                ('switch', DISCOVER_SWITCHES),
+                ('climate', DISCOVER_CLIMATE)
         ):
             # Get all devices of a specific type
             found_device_list = self._get_devices_by_type(
@@ -441,34 +411,22 @@ class AvmHomeAutomationBase(object):
             if found_device_list:
                 # Fire discovery event
                 __ain_list = [k for k in found_device_list.keys()]
-                _LOGGER.debug("Component '%s' going to add actors '%s'" %
-                              (component_name, ', '.join(__ain_list)))
+                _LOGGER.debug("Component '%s' going to add actors '%s'",
+                              component_name,
+                              ', '.join(__ain_list))
                 discovery.load_platform(
-                    self._hass,
+                    self.hass,
                     component_name,
                     DOMAIN,
                     {ATTR_DISCOVER_DEVICES: __ain_list},
                     self._config)
         return
 
-    def _create_device_dict(self, __ain):
-        from xml.etree import ElementTree as ET
-        import xmltodict
-        __device_xml = self.get_device_xml(__ain)
-        temp = xmltodict.parse(ET.tostring(__device_xml))
-        temp['device']['private_updated'] = True
-        try:
-            SCHEMA_DICT_DEVICE(temp['device'])
-        except vol.MultipleInvalid as e:
-            _LOGGER.error("Schema validation failed: %s" % str(e))
-        else:
-            return temp['device']
-
-    def _get_devices_by_type(self, device_list, discovery_type):
-        """Returns devices of a specific type"""
+    def _get_devices_by_type(self, device_list, discovery_type) -> dict:
+        """Returns only devices of a specific type"""
         __new_device_list = {}
         for __ain, __value in device_list.items():
-            __bitmask = __value['bitmask']
+            __bitmask = int(__value['dict']['@functionbitmask'])
             if discovery_type == DISCOVER_SWITCHES:
                 if bool((int(__bitmask) & BIT_MASK_SWITCH) ==
                         BIT_MASK_SWITCH):
@@ -486,9 +444,9 @@ class AvmHomeAutomationDevice(Entity):
         """Initialize the switch"""
         self._aha = aha
         self._ain = ain
-        self._hass = hass
+        self.hass = hass
         self.units = hass.config.units
-        aha._devices[ain]['instance'] = self
+        aha._fritz_actuator_dicts_xml[ain]['instance'] = self
         return
 
     def _validate_schema(self, value):
@@ -496,8 +454,8 @@ class AvmHomeAutomationDevice(Entity):
         SCHEMA_DICT_DEVICE(value)
 
     @property
-    def _dict(self):
-        return self._aha._devices[self._ain]['dict']
+    def _dict(self) -> dict:
+        return self._aha._fritz_actuator_dicts_xml[self._ain]['dict']
 
     # Import from Entity
     @property
@@ -546,7 +504,7 @@ class AvmHomeAutomationDevice(Entity):
     @property
     def assumed_state(self) -> bool:
         """Return True if unable to access real state of the entity."""
-        return True
+        return False
 
     @property
     def force_update(self) -> bool:
@@ -562,19 +520,16 @@ class AvmHomeAutomationDevice(Entity):
         """Flag supported features."""
         return int(self._dict['@functionbitmask'])
 
-    @asyncio.coroutine
-    def async_update(self):
-        """Retrieve latest state."""
-        # self.update_dict()
-        return
-
     # # Import from Climate (not in the parent list)
     @property
-    def current_temperature(self):
+    def current_temperature(self) -> float:
         """Return the current _temperature."""
-        return self.units.temperature(
-            float(
-                int(
-                    self._dict['temperature']['celsius']
-                    )
-                  ) / 10.0, TEMP_CELSIUS)
+        if self._dict['temperature']['celsius'] is not None:
+            return self.units.temperature(
+                float(
+                    int(
+                        self._dict['temperature']['celsius']
+                        )
+                    ) / 10.0, TEMP_CELSIUS)
+        else:
+            return 0.0

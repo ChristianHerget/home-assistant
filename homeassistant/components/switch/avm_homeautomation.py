@@ -37,10 +37,10 @@ def async_setup_platform(hass, config, async_add_entities,
 
         for __ain in __ains:
             __aha = hass.data[DATA_AVM_HOMEAUTOMATION][DOMAIN]
-            _LOGGER.debug("Adding device '%s'" % __ain)
+            _LOGGER.debug("Adding device '%s'", __ain)
             yield from async_add_entities(
                 [AvmHomeAutomationDeviceSwitch(hass, __ain, __aha)],
-                update_before_add=True
+                update_before_add=False
                 )
     return
 
@@ -85,18 +85,18 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
         VAL_SCHEMA_DICT_SWITCH(value)
 
     @property
-    def current_power_watt(self):
+    def current_power_watt(self) -> float:
         """Return the current power usage in Watt."""
         # mW to W
         return float(int(self._dict['powermeter']['power'])) / 1000.0
 
     @property
-    def total_energy_watt_hours(self):
+    def total_energy_watt_hours(self) -> int:
         """Return the energy usage in Watt Hours."""
         return int(self._dict['powermeter']['energy'])
 
     @property
-    def total_energy_killo_watt_hours(self):
+    def total_energy_killo_watt_hours(self) -> float:
         """Return the energy usage in Killo Watt Hours."""
         # Wh to kWh
         return float(int(self._dict['powermeter']['energy'])) / 1000.0
@@ -112,11 +112,6 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
                 return STATE_OFF
         else:
             return STATE_UNKNOWN
-
-    @property
-    def assumed_state(self) -> bool:
-        """Return True if unable to access real state of the entity."""
-        return False
 
     @property
     def device_state_attributes(self):
