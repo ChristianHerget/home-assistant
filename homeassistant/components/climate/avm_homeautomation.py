@@ -151,11 +151,6 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
         return self._convert_for_display(
             float(int(self._dict['hkr']['absenk'])) / 2.0)
 
-    @property
-    def temperature(self):
-        """Return the _temperature we try to reach."""
-        return self.taget_temperature
-
     @asyncio.coroutine
     def async_set_temperature(self, **kwargs):
         """Set new target _temperature."""
@@ -202,7 +197,7 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
         # no data available to create
         if not self.available:
             return attrs
-        
+
         # Add target temperature attributes for auto mode
         attrs.update({"target_temperature_economy":
                       self.target_temperature_economy})

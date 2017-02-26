@@ -16,7 +16,7 @@ from typing import Optional
 
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP, CONF_USERNAME, CONF_PASSWORD,
-    CONF_HOST, ATTR_ENTITY_ID, TEMP_CELSIUS, CONF_SCAN_INTERVAL)
+    CONF_HOST, TEMP_CELSIUS, CONF_SCAN_INTERVAL)
 from homeassistant.helpers import discovery
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
