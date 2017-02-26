@@ -34,7 +34,8 @@ DATA_AVM_HOMEAUTOMATION = 'data' + DOMAIN
 
 # Standard FRITZ!Box IP
 DEFAULT_HOST = 'fritz.box'
-# Default FRITZ!Box User Name, this isn't important as FRITZ!Box uses no user name by default
+# Default FRITZ!Box User Name
+# this isn't important as FRITZ!Box uses no user name by default
 DEFAULT_USERNAME = ''
 # Default Update Interval
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
@@ -44,60 +45,60 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Optional(CONF_HOST, default=DEFAULT_HOST):     cv.string,
         vol.Optional(CONF_USERNAME, default=DEFAULT_USERNAME): cv.string,
         vol.Required(CONF_PASSWORD):                                cv.string,
-        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): 
+        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL):
             vol.All(vol.Coerce(int), vol.Range(min=1)),
     }),
 }, extra=vol.ALLOW_EXTRA)
 
 SCHEMA_DICT_TEMPERATURE = {
-                vol.Required('celsius'): vol.Any(None, vol.Coerce(int)),
-                vol.Required('offset'): vol.Any(None, vol.Coerce(int)),
-                }
+    vol.Required('celsius'): vol.Any(None, vol.Coerce(int)),
+    vol.Required('offset'): vol.Any(None, vol.Coerce(int)),
+}
 
 SCHEMA_DICT_HKR = {
-                vol.Required('tist'): vol.Any(None, cv.positive_int),
-                vol.Required('tsoll'): vol.Any(None, cv.positive_int),
-                vol.Required('absenk'): vol.Any(None, cv.positive_int),
-                vol.Required('komfort'): vol.Any(None, cv.positive_int),
-                vol.Required('lock'): vol.Any(None, cv.positive_int),
-                vol.Optional('devicelock'): vol.Any(None, cv.positive_int),
-                vol.Optional('errorcode'): vol.Any(None, cv.positive_int),
-                vol.Optional('batterylow'): vol.Any(None, cv.positive_int),
-                vol.Optional('nextchange'): vol.Schema({
-                     vol.Optional('endperiod'): vol.Any(None, cv.positive_int),
-                     vol.Optional('tchange'): vol.Any(None, cv.positive_int),
-                    }),
-                }
+    vol.Required('tist'): vol.Any(None, cv.positive_int),
+    vol.Required('tsoll'): vol.Any(None, cv.positive_int),
+    vol.Required('absenk'): vol.Any(None, cv.positive_int),
+    vol.Required('komfort'): vol.Any(None, cv.positive_int),
+    vol.Required('lock'): vol.Any(None, cv.positive_int),
+    vol.Optional('devicelock'): vol.Any(None, cv.positive_int),
+    vol.Optional('errorcode'): vol.Any(None, cv.positive_int),
+    vol.Optional('batterylow'): vol.Any(None, cv.positive_int),
+    vol.Optional('nextchange'): vol.Schema({
+        vol.Optional('endperiod'): vol.Any(None, cv.positive_int),
+        vol.Optional('tchange'): vol.Any(None, cv.positive_int),
+    }),
+}
 
 SCHEMA_DICT_POWERMETER = {
-                vol.Required('power'): vol.Any(None, cv.positive_int),
-                vol.Required('energy'): vol.Any(None, cv.positive_int),
-                }
+    vol.Required('power'): vol.Any(None, cv.positive_int),
+    vol.Required('energy'): vol.Any(None, cv.positive_int),
+}
 
 SCHEMA_DICT_SWITCH = {
-                vol.Required('state'): vol.Any(None, cv.boolean),
-                vol.Optional('mode'): vol.Any(None, cv.string),
-                vol.Optional('lock'): vol.Any(None, cv.boolean),
-                vol.Optional('devicelock'): vol.Any(None, cv.boolean),
-                }
+    vol.Required('state'): vol.Any(None, cv.boolean),
+    vol.Optional('mode'): vol.Any(None, cv.string),
+    vol.Optional('lock'): vol.Any(None, cv.boolean),
+    vol.Optional('devicelock'): vol.Any(None, cv.boolean),
+}
 
 SCHEMA_DICT_DEVICE = vol.Schema({
-            # Attributes
-            vol.Required('@identifier'):      cv.string,
-            vol.Required('@id'):              cv.positive_int,
-            vol.Required('@functionbitmask'): cv.positive_int,
-            vol.Required('@fwversion'):       cv.string,
-            vol.Required('@manufacturer'):    cv.string,
-            vol.Required('@productname'):     cv.string,
-            # Elements
-            vol.Required('present'):          cv.boolean,
-            vol.Required('name'):             cv.string,
-            vol.Optional('switch'):           SCHEMA_DICT_SWITCH,
-            vol.Optional('powermeter'):       SCHEMA_DICT_POWERMETER,
-            vol.Optional('temperature'):      SCHEMA_DICT_TEMPERATURE,
-            vol.Optional('hkr'):              SCHEMA_DICT_HKR,
-            vol.Required('private_updated'):  cv.boolean,
-        }, extra=vol.ALLOW_EXTRA)
+    # Attributes
+    vol.Required('@identifier'):      cv.string,
+    vol.Required('@id'):              cv.positive_int,
+    vol.Required('@functionbitmask'): cv.positive_int,
+    vol.Required('@fwversion'):       cv.string,
+    vol.Required('@manufacturer'):    cv.string,
+    vol.Required('@productname'):     cv.string,
+    # Elements
+    vol.Required('present'):          cv.boolean,
+    vol.Required('name'):             cv.string,
+    vol.Optional('switch'):           SCHEMA_DICT_SWITCH,
+    vol.Optional('powermeter'):       SCHEMA_DICT_POWERMETER,
+    vol.Optional('temperature'):      SCHEMA_DICT_TEMPERATURE,
+    vol.Optional('hkr'):              SCHEMA_DICT_HKR,
+    vol.Required('private_updated'):  cv.boolean,
+}, extra=vol.ALLOW_EXTRA)
 
 BIT_MASK_THERMOSTAT = (1 << 6)
 BIT_MASK_POWERMETER = (1 << 7)
@@ -106,6 +107,7 @@ BIT_MASK_SWITCH = (1 << 9)
 BIT_MASK_REPEATER = (1 << 10)
 
 _LOGGER = logging.getLogger(__name__)
+
 
 @asyncio.coroutine
 def async_setup(hass, config):
@@ -119,7 +121,7 @@ def async_setup(hass, config):
     # Create pyFBC to communicate with the FRITZ!Box
     fbc = pyFBC(session, host, username, password)
     # Log into FRITZ!Box
-    while True: 
+    while True:
         try:
             yield from fbc.async_new_session()
         except Exception as e:
@@ -155,8 +157,8 @@ class pyFBC(object):
         self._user = user
         self._password = password
         self._sid = None
-        self._rights = None       
-        self._blocktime = 0 
+        self._rights = None
+        self._blocktime = 0
         self.URL_LOGIN = "http://{}/login_sid.lua"
         self.URL_SWITCH = "http://{}/webservices/homeautoswitch.lua"
         return
@@ -180,11 +182,15 @@ class pyFBC(object):
         from xml.etree.ElementTree import fromstring
         import xmltodict
         from hashlib import md5
-        res = yield from self.async_fetch_string(self.URL_LOGIN.format(self._host))
+
+        res = yield from self.async_fetch_string(
+            self.URL_LOGIN.format(self._host))
+
         # Parse XML document
         dom = fromstring(res)
         sid = dom.findtext('./SID')
         challenge = dom.findtext('./Challenge')
+
         # Excecute teh following only if we havn'T already a valid SID
         if sid == '0000000000000000':
             # Calculate MD5 check sum (response)
@@ -193,15 +199,19 @@ class pyFBC(object):
             md5_var.update('-'.encode('utf-16le'))
             md5_var.update(self._password.encode('utf-16le'))
             response = challenge + '-' + md5_var.hexdigest()
+
             # Create params to send to FRITZ!Box
             params = {'username': self._user, 'response': response}
-            res = yield from self.async_fetch_string(self.URL_LOGIN.format(self._host), params=params)
+            res = yield from self.async_fetch_string(
+                self.URL_LOGIN.format(self._host), params=params)
             dom = fromstring(res)
             sid = dom.findtext('./SID')
+
             # Extract Right and BlockTime
             from xml.etree import ElementTree as ET
             temp = xmltodict.parse(ET.tostring(dom.find("Rights")))
             self._rights = temp['Rights']
+
             if sid == '0000000000000000':
                 self._blocktime = int(temp['BlockTime'] or 60)
                 raise HTTPForbidden()  # 403
@@ -215,7 +225,10 @@ class pyFBC(object):
         if self._sid is None:
             return
         else:
-            yield from self.async_fetch_string(self.URL_LOGIN.format(self._host), {'sid': self._sid, 'logout':''})
+            yield from self.async_fetch_string(
+                self.URL_LOGIN.format(self._host),
+                {'sid': self._sid, 'logout': ''}
+                )
         self._aio_session = None
         self._sha_sid = None
 
@@ -263,13 +276,13 @@ class pyFBC(object):
     @asyncio.coroutine
     def async_send_switch_command(self, params, ain=None) -> str:
         """Send command to FRITZ!Box via homeautoswitch.lua"""
-        if params == None:
+        if params is None:
             params = {}
-        if self._sid == None:
+        if self._sid is None:
             raise Exception
         else:
             params.update({'sid': self._sid})
-        if ain != None:
+        if ain is not None:
             params.update({'ain': ain})
         url = self.URL_SWITCH.format(str(self._host))
         try:
@@ -284,7 +297,8 @@ class pyFBC(object):
         """Get the XML file with the device states from FRITZ!Box"""
         from xml.etree.ElementTree import fromstring
         try:
-            __devices = yield from self.async_send_switch_command({"switchcmd": "getdevicelistinfos"})
+            __devices = yield from self.async_send_switch_command(
+                {"switchcmd": "getdevicelistinfos"})
         except Exception as e:
             raise e
             return None
@@ -295,14 +309,15 @@ class pyFBC(object):
 
 class AvmHomeAutomationBase(object):
     """AvmHomeAutomationBase"""
-    def __init__(self, hass, config, fbc):      
+    def __init__(self, hass, config, fbc):
         if DATA_AVM_HOMEAUTOMATION not in hass.data:
             hass.data[DATA_AVM_HOMEAUTOMATION] = {}
         self._hass = hass
         self._config = config
         self._fbc = fbc
         self._devices_xml = None
-        # Devices are stored as {ain: {bitmask: functionbitmask, dict: Dictionary, instance: object}, ...}
+        # Devices are stored as
+        # {ain: {bitmask: functionbitmask, dict: Dictionary, instance: object}, ...}
         # # todo: remove bitmask, as it is in dict
         self._devices = {}
         hass.data[DATA_AVM_HOMEAUTOMATION][DOMAIN] = self
@@ -323,7 +338,7 @@ class AvmHomeAutomationBase(object):
         for __ain in self._devices.keys():
             _LOGGER.debug("ASYNC Update: %s" % __ain)
             self._devices[__ain]['dict'] = self._create_device_dict(__ain)
-            task = self._devices[__ain]['instance'].async_update_dict()
+            task = self._devices[__ain]['instance'].async_update_ha_state()
             if task:
                 tasks.append(task)
         if tasks:
@@ -335,7 +350,7 @@ class AvmHomeAutomationBase(object):
         from xml.etree import ElementTree as ET
         try:
             devices = yield from self._fbc.async_send_switch_command(
-                {"switchcmd": "getdevicelistinfos"}) 
+                {"switchcmd": "getdevicelistinfos"})
         except Exception as e:
             _LOGGER.error("Login to FRITZ!Box failed: %s" % str(e))
             return
@@ -344,7 +359,7 @@ class AvmHomeAutomationBase(object):
     @asyncio.coroutine
     def async_get_devices_from_xml(self):
         # Get all devices, but don't create objects
-        if self._devices_xml == None:
+        if self._devices_xml is None:
             self._devices_xml = yield from self.async_get_devices_xml()
         devices = {}
         for device_xml in self._devices_xml.findall("device"):
@@ -359,17 +374,19 @@ class AvmHomeAutomationBase(object):
         # for device_xml in devices_xml.findall("group"):
         #    devices.update({device_xml.attrib['identifier']: None})
         return devices
-    
+
     @asyncio.coroutine
     def async_send_switch_command(self, params, ain=None) -> str:
         # Forwards switch commands
         try:
-            return (yield from self._fbc.async_send_switch_command(params, ain))
+            return (
+                yield from self._fbc.async_send_switch_command(params, ain)
+                )
         except Exception as e:
             raise e
 
     def get_device_xml(self, ain):
-        if self._devices_xml == None:
+        if self._devices_xml is None:
             raise Exception
         else:
             return self._devices_xml.find("device[@identifier='" + ain + "']")
@@ -379,7 +396,7 @@ class AvmHomeAutomationBase(object):
             if self._devices[ain]['dict'] == None:
                 self._devices[ain]['dict'] = self._create_device_dict(ain)
             __dict = self._devices[ain]['dict']
-            if dict == None:
+            if dict is None:
                 _LOGGER.error("'%s' has no device dictionary" % ain)
             else:
                 self._devices[ain]['private_updated'] = False
@@ -390,7 +407,10 @@ class AvmHomeAutomationBase(object):
             return None
 
     def update_devices(self, new_device_list):
-        """Compares new device list to current device list, adds and Removes devices"""
+        """
+        Compares new device list to current device list,
+        adds and Removes devices
+        """
         __added_devices = {}
         __removed_devices = {}
         for __ain in new_device_list.keys() - self._devices.keys():
@@ -398,12 +418,12 @@ class AvmHomeAutomationBase(object):
         for __ain in self._devices.keys() - new_device_list.keys():
             __removed_devices.update({__ain: new_device_list[__ain]})
         if __added_devices:
-            # Add new devices to central dictdevice list (dict)
+            # Add new devices to central device list (dict)
             self._devices.update(__added_devices)
             self._load_devices(__added_devices)
         if __removed_devices:
             for __ain, __value in __removed_devices.items():
-                if __value != None:
+                if __value is not None:
                     if __value['instance'] != None:
                         __value['instance'].remove()
                 self._devices.pop(__ain, None)
@@ -422,7 +442,7 @@ class AvmHomeAutomationBase(object):
             if found_device_list:
                 # Fire discovery event
                 __ain_list = [k for k in found_device_list.keys()]
-                _LOGGER.debug("Component '%s' going to add actors '%s'" % \
+                _LOGGER.debug("Component '%s' going to add actors '%s'" %
                               (component_name, ', '.join(__ain_list)))
                 discovery.load_platform(
                     self._hass,
@@ -431,7 +451,7 @@ class AvmHomeAutomationBase(object):
                     {ATTR_DISCOVER_DEVICES: __ain_list},
                     self._config)
         return
-    
+
     def _create_device_dict(self, __ain):
         from xml.etree import ElementTree as ET
         import xmltodict
@@ -451,12 +471,12 @@ class AvmHomeAutomationBase(object):
         for __ain, __value in device_list.items():
             __bitmask = __value['bitmask']
             if discovery_type == DISCOVER_SWITCHES:
-                if bool((int(__bitmask) & BIT_MASK_SWITCH)
-                        == BIT_MASK_SWITCH) == True:
+                if bool((int(__bitmask) & BIT_MASK_SWITCH) ==
+                        BIT_MASK_SWITCH):
                     __new_device_list.update({__ain: __value})
             elif discovery_type == DISCOVER_CLIMATE:
-                if bool((int(__bitmask) & BIT_MASK_THERMOSTAT)
-                        == BIT_MASK_THERMOSTAT) == True:
+                if bool((int(__bitmask) & BIT_MASK_THERMOSTAT) ==
+                        BIT_MASK_THERMOSTAT):
                     __new_device_list.update({__ain: __value})
         return __new_device_list
 
@@ -467,42 +487,26 @@ class AvmHomeAutomationDevice(Entity):
         """Initialize the switch"""
         self._aha = aha
         self._ain = ain
-        self._dict = aha._devices[ain]['dict']
         self.units = hass.config.units
         aha._devices[ain]['instance'] = self
         return
-
-    def async_update_dict(self):
-        """"Get a new dict from the AvmHomeAutomationBase"""
-        __dict = self._aha.get_device_dict(self._ain)
-        if __dict['private_updated'] == True:
-            try:
-                self._validate_schema(__dict)
-            except vol.MultipleInvalid as e:
-                _LOGGER.error("Schema validation failed: %s" % str(e))
-            else:
-                self._dict = __dict
-                self._assumed_state = False
-        else:
-            # Device dict seems to be somewaht out of date
-            self._assumed_state = True
-        if __dict['private_updated'] == True:
-            return self.async_update_ha_state()
-        else:
-            return None
 
     def _validate_schema(self, value):
         """Used to validate the Schema of the dict"""
         SCHEMA_DICT_DEVICE(value)
 
-    ## Import from Entity
+    @property
+    def _dict(self):
+        return self._aha._devices[self._ain]['dict']
+
+    # Import from Entity
     @property
     def should_poll(self) -> bool:
         """Return True if entity has to be polled for state.
 
         False if entity pushes its state to HA.
         """
-        return True
+        return False
 
     @property
     def name(self) -> Optional[str]:

@@ -162,6 +162,7 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
         yield from self._aha.async_send_switch_command(
             {'switchcmd': 'setswitchon'}, self._ain)
         self._dict['switch']['state'] = True
+        self.schedule_update_ha_state()
 
     @asyncio.coroutine
     def async_turn_off(self, **kwargs) -> None:
@@ -169,6 +170,7 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
         yield from self._aha.async_send_switch_command(
             {'switchcmd': 'setswitchoff'}, self._ain)
         self._dict['switch']['state'] = False
+        self.schedule_update_ha_state()
 
     # # Import from SwitchDevice
     # # None

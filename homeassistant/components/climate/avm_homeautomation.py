@@ -208,7 +208,9 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
             # Is an attributes and exists for this object
             if node in self._dict['hkr']:
                 value = data[1].get(
-                    int(self._dict['hkr'][node]), str(self._dict['hkr'][node]))
+                    int(self._dict['hkr'][node]),
+                    str(self._dict['hkr'][node])
+                    )
                 attrs[data[0]] = value
 
         return attrs
