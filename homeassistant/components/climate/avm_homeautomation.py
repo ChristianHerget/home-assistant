@@ -107,8 +107,8 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
         __operation = STATE_UNKNOWN
         if not self.available:
             __operation = STATE_UNKNOWN
-        elif ((self.target_temperature == self.target_temperature_high) or
-                (self.target_temperature == self.target_temperature_low)):
+        elif ((self.target_temperature == self.target_temperature_comfort) or
+                (self.target_temperature == self.target_temperature_economy)):
             __operation = STATE_AUTO
         else:
             __target = int(self._dict['hkr']['tsoll'])
@@ -140,13 +140,13 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
         return self._convert_for_display(float(__target) / 2.0)
 
     @property
-    def target_temperature_high(self) -> float:
+    def target_temperature_comfort(self) -> float:
         """Return the highbound target temperature we try to reach."""
         return self._convert_for_display(
             float(int(self._dict['hkr']['komfort'])) / 2.0)
 
     @property
-    def target_temperature_low(self) -> float:
+    def target_temperature_economy(self) -> float:
         """Return the lowbound target temperature we try to reach."""
         return self._convert_for_display(
             float(int(self._dict['hkr']['absenk'])) / 2.0)
@@ -202,6 +202,12 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
         # no data available to create
         if not self.available:
             return attrs
+        
+        # Add target temperature attributes for auto mode
+        attrs.update({"target_temperature_economy":
+                      self.target_temperature_economy})
+        attrs.update({"target_temperature_comfort":
+                      self.target_temperature_comfort})
 
         # Generate an attributes list
         for node, data in HM_ATTRIBUTE_SUPPORT.items():
