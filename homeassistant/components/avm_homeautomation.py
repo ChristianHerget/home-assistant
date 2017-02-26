@@ -38,7 +38,7 @@ DEFAULT_HOST = 'fritz.box'
 # this isn't important as FRITZ!Box uses no user name by default
 DEFAULT_USERNAME = ''
 # Default Update Interval
-DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
+DEFAULT_SCAN_INTERVAL = 30
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
@@ -115,7 +115,7 @@ def async_setup(hass, config):
     host = config[DOMAIN].get(CONF_HOST)
     username = config[DOMAIN].get(CONF_USERNAME)
     password = config[DOMAIN].get(CONF_PASSWORD)
-    interval = config[DOMAIN].get(CONF_SCAN_INTERVAL)
+    interval = timedelta(seconds=config[DOMAIN].get(CONF_SCAN_INTERVAL))
     # Get aiohttp session
     session = async_get_clientsession(hass)
     # Create pyFBC to communicate with the FRITZ!Box
@@ -334,15 +334,14 @@ class AvmHomeAutomationBase(object):
         else:
             if self._devices_xml is None:
                 return
-        tasks = []
         for __ain in self._devices.keys():
-            _LOGGER.debug("ASYNC Update: %s" % __ain)
-            self._devices[__ain]['dict'] = self._create_device_dict(__ain)
-            task = self._devices[__ain]['instance'].async_update_ha_state()
-            if task:
-                tasks.append(task)
-        if tasks:
-            yield from asyncio.wait(tasks, loop=self._hass.loop)
+            new_dict = self._create_device_dict(__ain)
+
+            if new_dict != self._devices[__ain]['dict']:
+                self._devices[__ain]['dict'] = new_dict
+                _LOGGER.debug("Schedule ASYNC Update of '%s'" % __ain)
+                self._devices[__ain]['instance'].schedule_update_ha_state(
+                    force_refresh=False)
         return
 
     @asyncio.coroutine
@@ -487,6 +486,7 @@ class AvmHomeAutomationDevice(Entity):
         """Initialize the switch"""
         self._aha = aha
         self._ain = ain
+        self._hass = hass
         self.units = hass.config.units
         aha._devices[ain]['instance'] = self
         return
