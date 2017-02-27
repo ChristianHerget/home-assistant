@@ -13,10 +13,11 @@ import homeassistant.helpers.config_validation as cv
 
 from homeassistant.const import (STATE_ON, STATE_OFF, STATE_UNKNOWN)
 from homeassistant.components.switch import (SwitchDevice)
+from homeassistant.components.climate import (STATE_AUTO)
 from homeassistant.components.avm_homeautomation import (
     AvmHomeAutomationDevice, ATTR_DISCOVER_DEVICES, DATA_AVM_HOMEAUTOMATION,
     DOMAIN, SCHEMA_DICT_SWITCH, SCHEMA_DICT_POWERMETER,
-    SCHEMA_DICT_TEMPERATURE, SCHEMA_DICT_HKR)
+    SCHEMA_DICT_TEMPERATURE, SCHEMA_DICT_HKR, STATE_MANUAL)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,9 +72,9 @@ VAL_SCHEMA_DICT_SWITCH = vol.Schema({
         }, extra=vol.ALLOW_EXTRA)
 
 HM_ATTRIBUTE_SUPPORT = {
-    'mode':       ['mode', {}],
-    'lock':       ['lock', {0: 'No', 1: 'Yes'}],
-    'devicelock': ['devicelock', {0: 'No', 1: 'Yes'}],
+    'mode':       ['mode', {'auto': STATE_AUTO, 'manuell': STATE_MANUAL}],
+    'lock':       ['lock', {'0': False, '1': True}],
+    'devicelock': ['devicelock', {'0': False, '1': True}],
 }
 
 
@@ -126,8 +127,7 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
             (self.current_power_watt, ATTR_CURRENT_CONSUMPTION_UNIT)
         attrs[ATTR_TOTAL_CONSUMPTION] = "%.3f %s" % \
             (self.total_energy_killo_watt_hours, ATTR_TOTAL_CONSUMPTION_UNIT)
-        attrs[ATTR_TEMPERATURE] = "%.1f %s" % \
-            (self.current_temperature, self.units.temperature_unit)
+        attrs[ATTR_TEMPERATURE] = "%.1f" % self.current_temperature
 
         # Generate an attributes list
         for node, data in HM_ATTRIBUTE_SUPPORT.items():
@@ -136,7 +136,7 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
                 value = str(self._dict['switch'][node])
                 try:
                     value = data[1].get(
-                        int(self._dict['switch'][node]),
+                        self._dict['switch'][node],
                         str(self._dict['switch'][node])
                         )
                 except Exception:

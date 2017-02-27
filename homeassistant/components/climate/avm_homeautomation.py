@@ -17,7 +17,7 @@ from homeassistant.const import (ATTR_TEMPERATURE, TEMP_CELSIUS, STATE_UNKNOWN)
 from homeassistant.components.avm_homeautomation import (
     ATTR_DISCOVER_DEVICES, DATA_AVM_HOMEAUTOMATION, DOMAIN,
     AvmHomeAutomationDevice, SCHEMA_DICT_SWITCH, SCHEMA_DICT_POWERMETER,
-    SCHEMA_DICT_TEMPERATURE, SCHEMA_DICT_HKR)
+    SCHEMA_DICT_TEMPERATURE, SCHEMA_DICT_HKR, STATE_MANUAL)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,21 +61,17 @@ SCHEMA_DICT_CLIMATE = vol.Schema({
             vol.Required('private_updated'):  cv.boolean,
         }, extra=vol.ALLOW_EXTRA)
 
-STATE_MANUAL = "manual"
 THERMOSTAT_STATES = [STATE_AUTO, STATE_MANUAL, STATE_ON, STATE_OFF]
 
 ATTR_BATTERY_STATE = "Battery"
-
 STATE_BATTERY_OK = "Ok"
 STATE_BATTERY_LOW = "Low"
 
-BATTERY_STATES = [STATE_BATTERY_OK, STATE_BATTERY_LOW]
-
 HM_ATTRIBUTE_SUPPORT = {
-    'lock':       ['lock', {0: 'No', 1: 'Yes'}],
-    'devicelock': ['devicelock', {0: 'No', 1: 'Yes'}],
+    'lock':       ['lock', {0: False, 1: True}],
+    'devicelock': ['devicelock', {0: False, 1: True}],
     'errorcode':  ['errorcode', {}],
-    'batterylow': ['Battery', {0: 'Normal', 1: 'Low'}],
+    'batterylow': [ATTR_BATTERY_STATE, {0: STATE_BATTERY_OK, 1: STATE_BATTERY_LOW}],
 }
 
 
@@ -104,28 +100,36 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
     @property
     def current_operation(self):
         """Return the current operation. head, cool idle."""
-        __operation = STATE_UNKNOWN
+        _operation = STATE_UNKNOWN
+        _target = int(self._dict['hkr']['tsoll'])
+        _low = int(self._dict['hkr']['absenk'])
+        _high = int(self._dict['hkr']['komfort'])
+
         if not self.available:
-            __operation = STATE_UNKNOWN
-        elif ((self.target_temperature == self.target_temperature_comfort) or
-                (self.target_temperature == self.target_temperature_economy)):
-            __operation = STATE_AUTO
+            _operation = STATE_UNKNOWN
+        elif (_target == _low) or (_target == _high):
+            _operation = STATE_AUTO
+        elif _target == 253:
+            _operation = STATE_OFF
+        elif _target == 254:
+            _operation = STATE_ON
         else:
-            __target = int(self._dict['hkr']['tsoll'])
+            _operation = STATE_MANUAL
 
-            if __target == 253:
-                __operation = STATE_OFF
-            elif __target == 254:
-                __operation = STATE_ON
-            else:
-                __operation = STATE_MANUAL
-
-        return __operation
+        return _operation
 
     @property
     def operation_list(self):
         """Return the operation modes list."""
         return THERMOSTAT_STATES
+
+    @property
+    def current_temperature(self) -> float:
+        """Return the current _temperature."""
+        if self._dict['temperature']['celsius'] is not None:
+            return float(int(self._dict['temperature']['celsius'])) / 10.0
+        else:
+            return 0.0
 
     @property
     def target_temperature(self) -> float:
@@ -137,7 +141,7 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
         elif __target == 254:
             __target = 60
 
-        return self._convert_for_display(float(__target) / 2.0)
+        return float(__target) / 2.0
 
     @property
     def target_temperature_comfort(self) -> float:
@@ -190,14 +194,14 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
         return
 
     @property
-    def min_temp(self):
+    def min_temp(self) -> float:
         """Return the minimum temperature."""
-        return self._convert_for_display(8.0)
+        return 8.0
 
     @property
-    def max_temp(self):
+    def max_temp(self) -> float:
         """Return the maximum temperature."""
-        return self._convert_for_display(28.0)
+        return 28.0
 
     @property
     def device_state_attributes(self):
