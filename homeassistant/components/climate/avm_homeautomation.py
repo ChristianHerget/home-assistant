@@ -1,5 +1,6 @@
 """
 Support for FRITZ!DECT thermostats (300 and Comet DECT).
+
 For more details about this component, please refer to the documentation at
 https://home-assistant.io/components/climate.avm_homeautomation/
 """
@@ -27,7 +28,6 @@ DEPENDENCIES = ['avm_homeautomation']
 def async_setup_platform(hass, config, async_add_entities,
                          discovery_info=None):
     """Setup the avm_smarthome switch platform."""
-
     if discovery_info is None:
         return
     else:
@@ -41,6 +41,7 @@ def async_setup_platform(hass, config, async_add_entities,
                 update_before_add=False)
 
     return
+
 
 SCHEMA_DICT_CLIMATE = vol.Schema({
             # Attributes
@@ -70,7 +71,8 @@ HM_ATTRIBUTE_SUPPORT = {
     'lock':       ['lock', {0: False, 1: True}],
     'devicelock': ['devicelock', {0: False, 1: True}],
     'errorcode':  ['errorcode', {}],
-    'batterylow': [ATTR_BATTERY_STATE, {0: STATE_BATTERY_OK, 1: STATE_BATTERY_LOW}],
+    'batterylow': [ATTR_BATTERY_STATE, {0: STATE_BATTERY_OK,
+                                        1: STATE_BATTERY_LOW}],
 }
 
 
@@ -78,7 +80,7 @@ class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
     """Representation of a AVM Thermostat."""
 
     def _validate_schema(self, value):
-        """Used to validate the Schema of the dict"""
+        """Used to validate the Schema of the dict."""
         SCHEMA_DICT_CLIMATE(value)
 
     @property

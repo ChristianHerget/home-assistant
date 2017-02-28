@@ -1,5 +1,6 @@
 """
 Support for FRITZ!DECT switches.
+
 For more details about this component, please refer to the documentation at
 https://home-assistant.io/components/switch.avm_homeautomation/
 """
@@ -27,7 +28,6 @@ DEPENDENCIES = ['avm_homeautomation']
 def async_setup_platform(hass, config, async_add_entities,
                          discovery_info=None):
     """Setup the avm_smarthome switch platform."""
-
     if discovery_info is None:
         return
     else:
@@ -43,6 +43,7 @@ def async_setup_platform(hass, config, async_add_entities,
                 update_before_add=False
                 )
     return
+
 
 ATTR_CURRENT_CONSUMPTION = 'Current Consumption'
 ATTR_CURRENT_CONSUMPTION_UNIT = 'W'
@@ -81,7 +82,7 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
     """Representation of a FRITZ!DECT switch."""
 
     def _validate_schema(self, value):
-        """Used to validate the Schema of the dict"""
+        """Used to validate the Schema of the dict."""
         VAL_SCHEMA_DICT_SWITCH(value)
 
     @property

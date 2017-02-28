@@ -1,5 +1,6 @@
 """
 Support for FRITZ!DECT devices (AVM Home Automation).
+
 For more details about this component, please refer to the documentation at
 https://home-assistant.io/components/avm_homeautomation/
 """
@@ -120,7 +121,7 @@ def async_setup(hass, config):
     # Get aiohttp session
     session = async_get_clientsession(hass)
     # Create pyFBC to communicate with the FRITZ!Box
-    fbc = pyFBC(session, host, username, password)
+    fbc = yaFBC(session, host, username, password)
     # Log into FRITZ!Box
     while True:
         try:
@@ -153,10 +154,14 @@ def async_setup(hass, config):
     return True
 
 
-class pyFBC(object):
-    """Python FRITZ!Box Connect."""
+class yaFBC(object):
+    """Yet an Async FRITZ!Box Connector for Python."""
+
+    URL_LOGIN = "http://{}/login_sid.lua"
+    URL_SWITCH = "http://{}/webservices/homeautoswitch.lua"
 
     def __init__(self, session, host, user, password):
+        """Initialize FB connect."""
         self._aio_session = session
         self._host = host
         self._user = user
@@ -164,8 +169,6 @@ class pyFBC(object):
         self._sid = None
         self._rights = None
         self._blocktime = 0
-        self.URL_LOGIN = "http://{}/login_sid.lua"
-        self.URL_SWITCH = "http://{}/webservices/homeautoswitch.lua"
         return
 
     @property
@@ -362,6 +365,10 @@ class AvmHomeAutomationBase(object):
 
     @asyncio.coroutine
     def async_get_fritz_actuator_dicts(self) -> dict:
+        """
+        Fetch new xml with actuator states from FRITZ!Box,
+        and convert it to a Python dict
+        """
         import xmltodict
         try:
             devices = yield from self._fbc.async_send_switch_command(
@@ -397,7 +404,8 @@ class AvmHomeAutomationBase(object):
 
     def _load_new_device(self, device_list) -> None:
         """
-        Looks up the different device types and loads the appropriate platform.
+        Looks up the different device types,
+        and loads the appropriate platform.
         """
         for component_name, discovery_type in (
                     ('switch', DISCOVER_SWITCHES),
@@ -422,7 +430,7 @@ class AvmHomeAutomationBase(object):
         return
 
     def _get_devices_by_type(self, device_list, discovery_type) -> dict:
-        """Returns only devices of a specific type"""
+        """Returns only devices of a specific type."""
         __new_device_list = {}
         for __ain, __value in device_list.items():
             __bitmask = int(__value['dict']['@functionbitmask'])
@@ -438,9 +446,10 @@ class AvmHomeAutomationBase(object):
 
 
 class AvmHomeAutomationDevice(Entity):
-    """An abstract class for a AvmHomeAutomationDevice entity"""
+    """An abstract class for a AvmHomeAutomationDevice entity."""
+
     def __init__(self, hass, ain, aha):
-        """Initialize the switch"""
+        """Initialize the switch."""
         self._aha = aha
         self._ain = ain
         self.hass = hass
@@ -449,7 +458,7 @@ class AvmHomeAutomationDevice(Entity):
         return
 
     def _validate_schema(self, value):
-        """Used to validate the Schema of the dict"""
+        """Used to validate the Schema of the dict."""
         SCHEMA_DICT_DEVICE(value)
 
     @property
