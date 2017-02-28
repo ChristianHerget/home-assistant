@@ -328,9 +328,7 @@ class AvmHomeAutomationBase(object):
         self._fritz_actuator_dicts_xml = dict()
         # Devices are stored as
         # {ain: {dict: Dictionary, instance: object}, ...}
-        # # todo: remove bitmask, as it is in dict
         self._fritz_actuator_dicts_xml = dict()
-        self._fritz_groups_dicts_xml = dict()
         hass.data[DATA_AVM_HOMEAUTOMATION][DOMAIN] = self
         return
 
@@ -359,48 +357,6 @@ class AvmHomeAutomationBase(object):
                 yield from self._fritz_actuator_dicts_xml[ain]['instance'].\
                   async_remove()
                 self._fritz_actuator_dicts_xml.pop(ain, None)
-
-        new_groups = new_list['groups']
-        for ain, new_group in new_groups.items():
-            members = str(new_group['groupinfo']['members']).split(',')
-            entity_ids = list()
-            for age in self._fritz_actuator_dicts_xml.values():
-                if age['dict']['@id'] in members and age['instance'] is not\
-                  None:
-                    entity_ids.append(age['instance'].entity_id)
-
-            if entity_ids:
-                if ain in self._fritz_groups_dicts_xml and\
-                  self._fritz_groups_dicts_xml[ain]['instance'] is not None:
-                    if entity_ids !=\
-                      self._fritz_groups_dicts_xml[ain]['entity_ids']:
-                        yield from\
-                          self._fritz_groups_dicts_xml[ain]['instance']\
-                          .async_update_tracked_entity_ids(entity_ids)
-                        self._fritz_groups_dicts_xml[ain]['entity_ids'] =\
-                            entity_ids
-                else:
-                    # Create new entry in central group dict
-                    from homeassistant.loader import get_component
-                    group_comp = get_component('group')
-                    grp = yield from group_comp.Group.async_create_group(
-                        self.hass, new_group['name'], entity_ids)
-
-                    new_device = {ain: {'dict': new_group,
-                                        'instance': grp,
-                                        'entity_ids': entity_ids}}
-
-                    self._fritz_groups_dicts_xml.update(new_device)
-                if new_group != self._fritz_groups_dicts_xml[ain]['dict']:
-                    self._fritz_groups_dicts_xml[ain]['instance']\
-                      .schedule_update_ha_state(force_refresh=False)
-
-        for ain in self._fritz_groups_dicts_xml.keys() - new_groups.keys():
-            _LOGGER.debug("Going to remove group: %s", ain)
-            if self._fritz_groups_dicts_xml[ain]['instance'] is not None:
-                yield from self._fritz_groups_dicts_xml[ain]['instance'].\
-                  async_remove()
-                self._fritz_groups_dicts_xml.pop(ain, None)
 
         return
 
@@ -444,9 +400,8 @@ class AvmHomeAutomationBase(object):
         Looks up the different device types and loads the appropriate platform.
         """
         for component_name, discovery_type in (
-                ('switch', DISCOVER_SWITCHES),
-                ('climate', DISCOVER_CLIMATE)
-        ):
+                    ('switch', DISCOVER_SWITCHES),
+                    ('climate', DISCOVER_CLIMATE)):
             # Get all devices of a specific type
             found_device_list = self._get_devices_by_type(
                 device_list, discovery_type)
