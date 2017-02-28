@@ -396,8 +396,9 @@ class AvmHomeAutomationBase(object):
     def _load_new_device(self, device_list) -> None:
         """Look up the different device types and loads platform."""
         for component_name, discovery_type in (
-              ('switch', DISCOVER_SWITCHES),
-              ('climate', DISCOVER_CLIMATE)):
+            ('switch', DISCOVER_SWITCHES),
+            ('climate', DISCOVER_CLIMATE)
+            ):
             # Get all devices of a specific type
             found_device_list = self._get_devices_by_type(
                 device_list, discovery_type)
@@ -444,10 +445,6 @@ class AvmHomeAutomationDevice(Entity):
         self.units = hass.config.units
         aha.fritz_actuator_dicts_xml[ain]['instance'] = self
         return
-
-    def _validate_schema(self, value):
-        """Used to validate the Schema of the dict."""
-        SCHEMA_DICT_DEVICE(value)
 
     @property
     def _dict(self) -> dict:

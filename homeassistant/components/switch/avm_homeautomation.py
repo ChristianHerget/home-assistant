@@ -81,10 +81,6 @@ HM_ATTRIBUTE_SUPPORT = {
 class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
     """Representation of a FRITZ!DECT switch."""
 
-    def _validate_schema(self, value):
-        """Used to validate the Schema of the dict."""
-        VAL_SCHEMA_DICT_SWITCH(value)
-
     @property
     def current_power_watt(self) -> float:
         """Return the current power usage in Watt."""

@@ -79,10 +79,6 @@ HM_ATTRIBUTE_SUPPORT = {
 class AvmThermostat(AvmHomeAutomationDevice, ClimateDevice):
     """Representation of a AVM Thermostat."""
 
-    def _validate_schema(self, value):
-        """Used to validate the Schema of the dict."""
-        SCHEMA_DICT_CLIMATE(value)
-
     @property
     def unit_of_measurement(self):
         """The unit of measurement to display."""
