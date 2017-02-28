@@ -9,11 +9,12 @@ import logging
 import asyncio
 from datetime import timedelta
 
-import voluptuous as vol
-import homeassistant.helpers.config_validation as cv
-
 from typing import Optional
+import voluptuous as vol
 
+from aiohttp.web_exceptions import HTTPClientError
+
+import homeassistant.helpers.config_validation as cv
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP, CONF_USERNAME, CONF_PASSWORD,
     CONF_HOST, TEMP_CELSIUS, CONF_SCAN_INTERVAL)
@@ -114,7 +115,6 @@ _LOGGER = logging.getLogger(__name__)
 @asyncio.coroutine
 def async_setup(hass, config):
     """Setup the avm_smarthome component."""
-    from aiohttp.web_exceptions import HTTPClientError
     host = config[DOMAIN].get(CONF_HOST)
     username = config[DOMAIN].get(CONF_USERNAME)
     password = config[DOMAIN].get(CONF_PASSWORD)
@@ -315,6 +315,8 @@ class YaFBC(object):
 class AvmHomeAutomationBase(object):
     """AvmHomeAutomationBase."""
 
+    # pylint: disable=no-self-use
+
     def __init__(self, hass, config, fbc):
         """Initialize Component."""
         if DATA_AVM_HOMEAUTOMATION not in hass.data:
@@ -324,7 +326,7 @@ class AvmHomeAutomationBase(object):
         self._fbc = fbc
         # Devices are stored as
         # {ain: {dict: Dictionary, instance: object}, ...}
-        self._fritz_actuator_dicts_xml = dict()
+        self.fritz_actuator_dicts_xml = dict()
         hass.data[DATA_AVM_HOMEAUTOMATION][DOMAIN] = self
         return
 
@@ -335,24 +337,24 @@ class AvmHomeAutomationBase(object):
 
         new_dicts = new_list['actuators']
         for ain, new_dict in new_dicts.items():
-            if ain in self._fritz_actuator_dicts_xml:
-                if new_dict != self._fritz_actuator_dicts_xml[ain]['dict']:
+            if ain in self.fritz_actuator_dicts_xml:
+                if new_dict != self.fritz_actuator_dicts_xml[ain]['dict']:
                     _LOGGER.debug("Schedule ASYNC Update of '%s'", ain)
-                    self._fritz_actuator_dicts_xml[ain]['dict'] = new_dict
-                    self._fritz_actuator_dicts_xml[ain]['instance'].\
+                    self.fritz_actuator_dicts_xml[ain]['dict'] = new_dict
+                    self.fritz_actuator_dicts_xml[ain]['instance'].\
                         schedule_update_ha_state(force_refresh=False)
             else:
                 # Create new entry in central actuator dict
                 new_device = {ain: {'dict': new_dict, 'instance': None}}
-                self._fritz_actuator_dicts_xml.update(new_device)
+                self.fritz_actuator_dicts_xml.update(new_device)
                 self._load_new_device(new_device)
 
-        for ain in self._fritz_actuator_dicts_xml.keys() - new_dicts.keys():
+        for ain in self.fritz_actuator_dicts_xml.keys() - new_dicts.keys():
             _LOGGER.debug("Going to remove: %s", ain)
-            if self._fritz_actuator_dicts_xml[ain]['instance'] is not None:
-                yield from self._fritz_actuator_dicts_xml[ain]['instance'].\
+            if self.fritz_actuator_dicts_xml[ain]['instance'] is not None:
+                yield from self.fritz_actuator_dicts_xml[ain]['instance'].\
                   async_remove()
-                self._fritz_actuator_dicts_xml.pop(ain, None)
+                self.fritz_actuator_dicts_xml.pop(ain, None)
 
         return
 
@@ -367,8 +369,8 @@ class AvmHomeAutomationBase(object):
         try:
             devices = yield from self._fbc.async_send_switch_command(
                 {"switchcmd": "getdevicelistinfos"})
-        except Exception as e:
-            _LOGGER.error("Login to FRITZ!Box failed: %s", str(e))
+        except HTTPClientError as exception:
+            _LOGGER.error("Login to FRITZ!Box failed: %s", str(exception))
             return
         temp = xmltodict.parse(devices)
         return_val = dict({'actuators': dict(), 'groups': dict()})
@@ -389,18 +391,13 @@ class AvmHomeAutomationBase(object):
     def async_send_switch_command(self, params, ain=None) -> str:
         """Send a switch command to the FRITZ!Box."""
         # Forwards switch commands
-        try:
-            return (
-                yield from self._fbc.async_send_switch_command(params, ain)
-                )
-        except Exception as e:
-            raise e
+        return (yield from self._fbc.async_send_switch_command(params, ain))
 
     def _load_new_device(self, device_list) -> None:
-        """Looks up the different device types and loads platform."""
+        """Look up the different device types and loads platform."""
         for component_name, discovery_type in (
-                    ('switch', DISCOVER_SWITCHES),
-                    ('climate', DISCOVER_CLIMATE)):
+              ('switch', DISCOVER_SWITCHES),
+              ('climate', DISCOVER_CLIMATE)):
             # Get all devices of a specific type
             found_device_list = self._get_devices_by_type(
                 device_list, discovery_type)
@@ -421,7 +418,7 @@ class AvmHomeAutomationBase(object):
         return
 
     def _get_devices_by_type(self, device_list, discovery_type) -> dict:
-        """Returns only devices of a specific type."""
+        """Return only devices of a specific type."""
         __new_device_list = {}
         for __ain, __value in device_list.items():
             __bitmask = int(__value['dict']['@functionbitmask'])
@@ -445,7 +442,7 @@ class AvmHomeAutomationDevice(Entity):
         self._ain = ain
         self.hass = hass
         self.units = hass.config.units
-        aha._fritz_actuator_dicts_xml[ain]['instance'] = self
+        aha.fritz_actuator_dicts_xml[ain]['instance'] = self
         return
 
     def _validate_schema(self, value):
@@ -454,7 +451,7 @@ class AvmHomeAutomationDevice(Entity):
 
     @property
     def _dict(self) -> dict:
-        return self._aha._fritz_actuator_dicts_xml[self._ain]['dict']
+        return self._aha.fritz_actuator_dicts_xml[self._ain]['dict']
 
     # Import from Entity
     @property
