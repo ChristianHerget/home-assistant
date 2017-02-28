@@ -55,21 +55,21 @@ ATTR_TEMPERATURE = 'Temperature'
 
 
 VAL_SCHEMA_DICT_SWITCH = vol.Schema({
-            # Attributes
-            vol.Required('@identifier'):      cv.string,
-            vol.Required('@id'):              cv.positive_int,
-            vol.Required('@functionbitmask'): cv.positive_int,
-            vol.Required('@fwversion'):       cv.string,
-            vol.Required('@manufacturer'):    cv.string,
-            vol.Required('@productname'):     cv.string,
-            # Elements
-            vol.Required('present'):          cv.boolean,
-            vol.Required('name'):             cv.string,
-            vol.Required('switch'):           SCHEMA_DICT_SWITCH,
-            vol.Required('powermeter'):       SCHEMA_DICT_POWERMETER,
-            vol.Optional('temperature'):      SCHEMA_DICT_TEMPERATURE,
-            vol.Remove('hkr'):                SCHEMA_DICT_HKR,
-        }, extra=vol.ALLOW_EXTRA)
+    # Attributes
+    vol.Required('@identifier'):      cv.string,
+    vol.Required('@id'):              cv.positive_int,
+    vol.Required('@functionbitmask'): cv.positive_int,
+    vol.Required('@fwversion'):       cv.string,
+    vol.Required('@manufacturer'):    cv.string,
+    vol.Required('@productname'):     cv.string,
+    # Elements
+    vol.Required('present'):          cv.boolean,
+    vol.Required('name'):             cv.string,
+    vol.Required('switch'):           SCHEMA_DICT_SWITCH,
+    vol.Required('powermeter'):       SCHEMA_DICT_POWERMETER,
+    vol.Optional('temperature'):      SCHEMA_DICT_TEMPERATURE,
+    vol.Remove('hkr'):                SCHEMA_DICT_HKR,
+}, extra=vol.ALLOW_EXTRA)
 
 HM_ATTRIBUTE_SUPPORT = {
     'mode':       ['mode', {'auto': STATE_AUTO, 'manuell': STATE_MANUAL}],
@@ -133,14 +133,10 @@ class AvmHomeAutomationDeviceSwitch(AvmHomeAutomationDevice, SwitchDevice):
         for node, data in HM_ATTRIBUTE_SUPPORT.items():
             # Is an attributes and exists for this object
             if node in self._dict['switch']:
-                value = str(self._dict['switch'][node])
-                try:
-                    value = data[1].get(
-                        self._dict['switch'][node],
-                        str(self._dict['switch'][node])
-                        )
-                except Exception:
-                    pass
+                value = data[1].get(
+                    self._dict['switch'][node],
+                    str(self._dict['switch'][node])
+                    )
                 attrs[data[0]] = value
 
         return attrs

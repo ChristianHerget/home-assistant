@@ -44,22 +44,22 @@ def async_setup_platform(hass, config, async_add_entities,
 
 
 SCHEMA_DICT_CLIMATE = vol.Schema({
-            # Attributes
-            vol.Required('@identifier'):      cv.string,
-            vol.Required('@id'):              cv.positive_int,
-            vol.Required('@functionbitmask'): cv.positive_int,
-            vol.Required('@fwversion'):       cv.string,
-            vol.Required('@manufacturer'):    cv.string,
-            vol.Required('@productname'):     cv.string,
-            # Elements
-            vol.Required('present'):          cv.boolean,
-            vol.Required('name'):             cv.string,
-            vol.Remove('switch'):             SCHEMA_DICT_SWITCH,
-            vol.Remove('powermeter'):         SCHEMA_DICT_POWERMETER,
-            vol.Required('temperature'):      SCHEMA_DICT_TEMPERATURE,
-            vol.Required('hkr'):              SCHEMA_DICT_HKR,
-            vol.Required('private_updated'):  cv.boolean,
-        }, extra=vol.ALLOW_EXTRA)
+    # Attributes
+    vol.Required('@identifier'):      cv.string,
+    vol.Required('@id'):              cv.positive_int,
+    vol.Required('@functionbitmask'): cv.positive_int,
+    vol.Required('@fwversion'):       cv.string,
+    vol.Required('@manufacturer'):    cv.string,
+    vol.Required('@productname'):     cv.string,
+    # Elements
+    vol.Required('present'):          cv.boolean,
+    vol.Required('name'):             cv.string,
+    vol.Remove('switch'):             SCHEMA_DICT_SWITCH,
+    vol.Remove('powermeter'):         SCHEMA_DICT_POWERMETER,
+    vol.Required('temperature'):      SCHEMA_DICT_TEMPERATURE,
+    vol.Required('hkr'):              SCHEMA_DICT_HKR,
+    vol.Required('private_updated'):  cv.boolean,
+}, extra=vol.ALLOW_EXTRA)
 
 THERMOSTAT_STATES = [STATE_AUTO, STATE_MANUAL, STATE_ON, STATE_OFF]
 

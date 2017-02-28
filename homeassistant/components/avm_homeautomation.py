@@ -7,11 +7,11 @@ https://home-assistant.io/components/avm_homeautomation/
 
 import logging
 import asyncio
+from datetime import timedelta
 
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 
-from datetime import timedelta
 from typing import Optional
 
 from homeassistant.const import (
@@ -114,6 +114,7 @@ _LOGGER = logging.getLogger(__name__)
 @asyncio.coroutine
 def async_setup(hass, config):
     """Setup the avm_smarthome component."""
+    from aiohttp.web_exceptions import HTTPClientError
     host = config[DOMAIN].get(CONF_HOST)
     username = config[DOMAIN].get(CONF_USERNAME)
     password = config[DOMAIN].get(CONF_PASSWORD)
@@ -121,13 +122,13 @@ def async_setup(hass, config):
     # Get aiohttp session
     session = async_get_clientsession(hass)
     # Create pyFBC to communicate with the FRITZ!Box
-    fbc = yaFBC(session, host, username, password)
+    fbc = YaFBC(session, host, username, password)
     # Log into FRITZ!Box
     while True:
         try:
             yield from fbc.async_new_session()
-        except Exception as e:
-            _LOGGER.warning("Couldn't log into FRITZ!Box: %s", str(e))
+        except HTTPClientError as exception:
+            _LOGGER.warning("Couldn't log into FRITZ!Box: %s", str(exception))
             # Wait 10 seconds
             yield from asyncio.sleep(timedelta(seconds=fbc.blocktime + 10),
                                      loop=hass.loop)
@@ -154,7 +155,7 @@ def async_setup(hass, config):
     return True
 
 
-class yaFBC(object):
+class YaFBC(object):
     """Yet an Async FRITZ!Box Connector for Python."""
 
     URL_LOGIN = "http://{}/login_sid.lua"
@@ -262,11 +263,11 @@ class yaFBC(object):
             string = yield from res.text()
             return string.strip()
         elif status == 400:
-            _LOGGER.error("Status '%s' Bad Request" % status)
+            _LOGGER.error("Status '%s' Bad Request", status)
             raise HTTPBadRequest()
         elif status == 403:
             yield from res.release()
-            _LOGGER.debug("Status '%s' Forbidden, try to reconnect" % status)
+            _LOGGER.debug("Status '%s' Forbidden, try to reconnect", status)
             try:
                 if (yield from self.async_new_session()):
                     if 'sid' in params:
@@ -276,11 +277,11 @@ class yaFBC(object):
                 raise HTTPForbidden()
         elif status == 500:
             yield from res.release()
-            _LOGGER.debug("Status '%s' Internal Server" % status)
+            _LOGGER.debug("Status '%s' Internal Server", status)
             raise HTTPInternalServerError()
         else:
             yield from res.release()
-            _LOGGER.error("Status '%s' Unknown" % status)
+            _LOGGER.error("Status '%s' Unknown", status)
             raise Exception
         return None
 
@@ -296,26 +297,19 @@ class yaFBC(object):
         if ain is not None:
             params.update({'ain': ain})
         url = self.URL_SWITCH.format(str(self._host))
-        try:
-            res = yield from self.async_fetch_string(url, params=params)
-        except Exception as e:
-            raise e
-        else:
-            return res
+        res = yield from self.async_fetch_string(url, params=params)
+
+        return res
 
     @asyncio.coroutine
     def async_get_device_xml_as_string(self) -> str:
         """Get the XML file with the device states from FRITZ!Box."""
         from xml.etree.ElementTree import fromstring
-        try:
-            __devices = yield from self.async_send_switch_command(
-                {"switchcmd": "getdevicelistinfos"})
-        except Exception as e:
-            raise e
-            return None
-        else:
-            dom = fromstring(__devices)
-            return dom
+        __devices = yield from self.async_send_switch_command(
+            {"switchcmd": "getdevicelistinfos"})
+
+        dom = fromstring(__devices)
+        return dom
 
 
 class AvmHomeAutomationBase(object):
@@ -328,7 +322,6 @@ class AvmHomeAutomationBase(object):
         self.hass = hass
         self._config = config
         self._fbc = fbc
-        self._fritz_actuator_dicts_xml = dict()
         # Devices are stored as
         # {ain: {dict: Dictionary, instance: object}, ...}
         self._fritz_actuator_dicts_xml = dict()
@@ -366,8 +359,9 @@ class AvmHomeAutomationBase(object):
     @asyncio.coroutine
     def async_get_fritz_actuator_dicts(self) -> dict:
         """
-        Fetch new xml with actuator states from FRITZ!Box,
-        and convert it to a Python dict
+        Fetch new xml with actuator states from FRITZ!Box.
+
+        Converts it to a Python dict with AINs as keys.
         """
         import xmltodict
         try:
@@ -403,10 +397,7 @@ class AvmHomeAutomationBase(object):
             raise e
 
     def _load_new_device(self, device_list) -> None:
-        """
-        Looks up the different device types,
-        and loads the appropriate platform.
-        """
+        """Looks up the different device types and loads platform."""
         for component_name, discovery_type in (
                     ('switch', DISCOVER_SWITCHES),
                     ('climate', DISCOVER_CLIMATE)):
@@ -469,6 +460,7 @@ class AvmHomeAutomationDevice(Entity):
     @property
     def should_poll(self) -> bool:
         """Return True if entity has to be polled for state.
+
         False if entity pushes its state to HA.
         """
         return False
@@ -516,6 +508,7 @@ class AvmHomeAutomationDevice(Entity):
     @property
     def force_update(self) -> bool:
         """Return True if state updates should be forced.
+
         If True, a state change will be triggered anytime the state property is
         updated, not just when the value changes.
         """
