@@ -7,7 +7,7 @@ https://home-assistant.io/components/avm_homeautomation/
 
 import logging
 import asyncio
-from datetime import timedelta
+from datetime import (timedelta, datetime, timezone)
 
 from typing import Optional
 import voluptuous as vol
@@ -138,7 +138,8 @@ def async_setup(hass, config):
     ahab = AvmHomeAutomationBase(hass, config, fbc)
 
     # Add FRITZ!DECT Actuators
-    yield from ahab.async_update_fritz_actuator_dicts(None)
+    yield from ahab.async_update_fritz_actuator_dicts(
+        datetime.now(timezone.utc))
 
     # Schedule periodic device update
     async_track_time_interval(hass,
@@ -191,7 +192,6 @@ class YaFBC(object):
     def async_new_session(self) -> bool:
         """Establish a new session."""
         from aiohttp.web_exceptions import HTTPForbidden
-        from xml.etree.ElementTree import fromstring
         import xmltodict
         from hashlib import md5
 
@@ -199,9 +199,9 @@ class YaFBC(object):
             self.URL_LOGIN.format(self._host))
 
         # Parse XML document
-        dom = fromstring(res)
-        sid = dom.findtext('./SID')
-        challenge = dom.findtext('./Challenge')
+        login = xmltodict.parse(res)
+        sid = login['SessionInfo']['SID']
+        challenge = login['SessionInfo']['Challenge']
 
         # Excecute the following only if we havn'T already a valid SID
         if sid == '0000000000000000':
@@ -216,19 +216,18 @@ class YaFBC(object):
             params = {'username': self._user, 'response': response}
             res = yield from self.async_fetch_string(
                 self.URL_LOGIN.format(self._host), params=params)
-            dom = fromstring(res)
-            sid = dom.findtext('./SID')
+            login = xmltodict.parse(res)
+            sid = login['SessionInfo']['SID']
 
             # Extract Right and BlockTime
-            from xml.etree import ElementTree as ET
-            temp = xmltodict.parse(ET.tostring(dom.find("Rights")))
-            self._rights = temp['Rights']
+            self._rights = login['SessionInfo']['Rights']
 
             if sid == '0000000000000000':
-                self._blocktime = int(temp['BlockTime'] or 60)
+                self._blocktime = int(login['SessionInfo']['BlockTime'] or 60)
                 raise HTTPForbidden()  # 403
-            else:
-                self._sid = sid
+
+        self._sid = sid
+
         return True
 
     @asyncio.coroutine
@@ -334,27 +333,32 @@ class AvmHomeAutomationBase(object):
     def async_update_fritz_actuator_dicts(self, event) -> None:
         """Update all the FRITZ!DECT state dicts."""
         new_list = yield from self.async_get_fritz_actuator_dicts()
-
         new_dicts = new_list['actuators']
+
         for ain, new_dict in new_dicts.items():
             if ain in self.fritz_actuator_dicts_xml:
-                if new_dict != self.fritz_actuator_dicts_xml[ain]['dict']:
+                if timedelta(minutes=15) <=\
+                  event - self.fritz_actuator_dicts_xml[ain]['last_update'] or\
+                  new_dict != self.fritz_actuator_dicts_xml[ain]['dict']:
                     _LOGGER.debug("Schedule ASYNC Update of '%s'", ain)
                     self.fritz_actuator_dicts_xml[ain]['dict'] = new_dict
+                    self.fritz_actuator_dicts_xml[ain]['last_update'] = event
                     self.fritz_actuator_dicts_xml[ain]['instance'].\
                         schedule_update_ha_state(force_refresh=False)
             else:
                 # Create new entry in central actuator dict
-                new_device = {ain: {'dict': new_dict, 'instance': None}}
+                new_device = {ain: {'dict': new_dict,
+                                    'instance': None,
+                                    'last_update': event}}
                 self.fritz_actuator_dicts_xml.update(new_device)
                 self._load_new_device(new_device)
 
-        for ain in self.fritz_actuator_dicts_xml.keys() - new_dicts.keys():
-            _LOGGER.debug("Going to remove: %s", ain)
-            if self.fritz_actuator_dicts_xml[ain]['instance'] is not None:
-                yield from self.fritz_actuator_dicts_xml[ain]['instance'].\
+        for key in self.fritz_actuator_dicts_xml.keys() - new_dicts.keys():
+            _LOGGER.debug("Going to remove: %s", key)
+            if self.fritz_actuator_dicts_xml[key]['instance'] is not None:
+                yield from self.fritz_actuator_dicts_xml[key]['instance'].\
                   async_remove()
-                self.fritz_actuator_dicts_xml.pop(ain, None)
+                self.fritz_actuator_dicts_xml.pop(key, None)
 
         return
 
