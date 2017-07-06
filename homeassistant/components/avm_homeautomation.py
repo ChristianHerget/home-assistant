@@ -7,7 +7,7 @@ https://home-assistant.io/components/avm_homeautomation/
 
 import logging
 import asyncio
-from datetime import (timedelta, datetime, timezone)
+from datetime import (timedelta, datetime)
 
 from typing import Optional
 import voluptuous as vol
@@ -139,7 +139,7 @@ def async_setup(hass, config):
 
     # Add FRITZ!DECT Actuators
     yield from ahab.async_update_fritz_actuator_dicts(
-        datetime.now(timezone.utc))
+        datetime.now(hass.config.time_zone))
 
     # Schedule periodic device update
     async_track_time_interval(hass,
@@ -337,10 +337,14 @@ class AvmHomeAutomationBase(object):
 
         for ain, new_dict in new_dicts.items():
             if ain in self.fritz_actuator_dicts_xml:
-                if timedelta(minutes=15) <=\
-                  event - self.fritz_actuator_dicts_xml[ain]['last_update'] or\
-                  new_dict != self.fritz_actuator_dicts_xml[ain]['dict']:
-                    _LOGGER.debug("Schedule ASYNC Update of '%s'", ain)
+                delta = event -\
+                    self.fritz_actuator_dicts_xml[ain]['last_update']
+                if (timedelta(minutes=15) <=
+                        delta or
+                        new_dict !=
+                        self.fritz_actuator_dicts_xml[ain]['dict']):
+                    _LOGGER.debug("ASYNC Update of '%s', last %d minutes ago",
+                                  ain, delta.seconds/60)
                     self.fritz_actuator_dicts_xml[ain]['dict'] = new_dict
                     self.fritz_actuator_dicts_xml[ain]['last_update'] = event
                     self.fritz_actuator_dicts_xml[ain]['instance'].\
@@ -382,6 +386,7 @@ class AvmHomeAutomationBase(object):
         if 'devicelist' in temp:
             for device in temp['devicelist']['device']:
                 if '@identifier' in device:
+                    _LOGGER.debug("device list: %s", device)
                     ain = device['@identifier']
                     return_val['actuators'].update({ain: device})
             for group in temp['devicelist']['group']:
