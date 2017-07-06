@@ -386,13 +386,13 @@ class AvmHomeAutomationBase(object):
         if 'devicelist' in temp:
             for device in temp['devicelist']['device']:
                 if '@identifier' in device:
-                    _LOGGER.debug("device list: %s", device)
                     ain = device['@identifier']
                     return_val['actuators'].update({ain: device})
-            for group in temp['devicelist']['group']:
-                if '@identifier' in group:
-                    ain = group['@identifier']
-                    return_val['groups'].update({ain: group})
+            if 'group' in temp['devicelist']:
+                for group in temp['devicelist']['group']:
+                    if '@identifier' in group:
+                        ain = group['@identifier']
+                        return_val['groups'].update({ain: group})
 
         return return_val
 
