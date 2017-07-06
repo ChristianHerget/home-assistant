@@ -68,7 +68,7 @@ class TestCheckConfig(unittest.TestCase):
             res = check_config.check(get_test_config_dir('light.yaml'))
             change_yaml_files(res)
             self.assertDictEqual({
-                'components': {'light': [{'platform': 'demo'}]},
+                'components': {'light': [{'platform': 'demo'}], 'group': None},
                 'except': {},
                 'secret_cache': {},
                 'secrets': {},
@@ -85,6 +85,7 @@ class TestCheckConfig(unittest.TestCase):
             change_yaml_files(res)
 
             self.assertDictEqual({}, res['components'])
+            res['except'].pop(check_config.ERROR_STR)
             self.assertDictEqual(
                 {'http': {'password': 'err123'}},
                 res['except']
@@ -107,8 +108,10 @@ class TestCheckConfig(unittest.TestCase):
                     'protocol': '3.1.1',
                     'discovery': False,
                     'discovery_prefix': 'homeassistant',
+                    'tls_version': 'auto',
                 },
-                 'light': []},
+                 'light': [],
+                 'group': None},
                 res['components']
             )
             self.assertDictEqual(
@@ -129,19 +132,22 @@ class TestCheckConfig(unittest.TestCase):
             res = check_config.check(get_test_config_dir('badcomponent.yaml'))
             change_yaml_files(res)
             self.assertDictEqual({}, res['components'])
-            self.assertDictEqual({check_config.ERROR_STR:
-                                  ['Component not found: beer']},
-                                 res['except'])
+            self.assertDictEqual({
+                    check_config.ERROR_STR: [
+                        'Component not found: beer',
+                        'Setup failed for beer: Component not found.']
+                }, res['except'])
             self.assertDictEqual({}, res['secret_cache'])
             self.assertDictEqual({}, res['secrets'])
             self.assertListEqual(['.../badcomponent.yaml'], res['yaml_files'])
 
             res = check_config.check(get_test_config_dir('badplatform.yaml'))
             change_yaml_files(res)
-            self.assertDictEqual({'light': []}, res['components'])
-            self.assertDictEqual({check_config.ERROR_STR:
-                                  ['Platform not found: light.beer']},
-                                 res['except'])
+            assert res['components'] == {'light': [], 'group': None}
+            assert res['except'] == {
+                check_config.ERROR_STR: [
+                    'Platform not found: light.beer',
+                ]}
             self.assertDictEqual({}, res['secret_cache'])
             self.assertDictEqual({}, res['secrets'])
             self.assertListEqual(['.../badplatform.yaml'], res['yaml_files'])

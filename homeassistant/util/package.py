@@ -1,9 +1,9 @@
 """Helpers to install PyPi packages."""
 import logging
 import os
-import subprocess
 import sys
 import threading
+from subprocess import Popen, PIPE
 from urllib.parse import urlparse
 
 from typing import Optional
@@ -11,11 +11,13 @@ from typing import Optional
 import pkg_resources
 
 _LOGGER = logging.getLogger(__name__)
+
 INSTALL_LOCK = threading.Lock()
 
 
 def install_package(package: str, upgrade: bool=True,
-                    target: Optional[str]=None) -> bool:
+                    target: Optional[str]=None,
+                    constraints: Optional[str]=None) -> bool:
     """Install a package on PyPi. Accepts pip compatible package strings.
 
     Return boolean if install successful.
@@ -25,18 +27,24 @@ def install_package(package: str, upgrade: bool=True,
         if check_package_exists(package, target):
             return True
 
-        _LOGGER.info('Attempting install of %s', package)
+        _LOGGER.info("Attempting install of %s", package)
         args = [sys.executable, '-m', 'pip', 'install', '--quiet', package]
         if upgrade:
             args.append('--upgrade')
         if target:
             args += ['--target', os.path.abspath(target)]
 
-        try:
-            return subprocess.call(args) == 0
-        except subprocess.SubprocessError:
-            _LOGGER.exception('Unable to install package %s', package)
+        if constraints is not None:
+            args += ['--constraint', constraints]
+
+        process = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        _, stderr = process.communicate()
+        if process.returncode != 0:
+            _LOGGER.error("Unable to install package %s: %s",
+                          package, stderr.decode('utf-8').lstrip().strip())
             return False
+
+        return True
 
 
 def check_package_exists(package: str, lib_dir: str) -> bool:

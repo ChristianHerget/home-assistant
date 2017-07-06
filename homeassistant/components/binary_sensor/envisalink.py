@@ -15,13 +15,14 @@ from homeassistant.components.envisalink import (
     SIGNAL_ZONE_UPDATE)
 from homeassistant.const import ATTR_LAST_TRIP_TIME
 
-DEPENDENCIES = ['envisalink']
 _LOGGER = logging.getLogger(__name__)
+
+DEPENDENCIES = ['envisalink']
 
 
 @asyncio.coroutine
 def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
-    """Setup Envisalink binary sensor devices."""
+    """Set up the Envisalink binary sensor devices."""
     configured_zones = discovery_info['zones']
 
     devices = []
@@ -37,7 +38,7 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
         )
         devices.append(device)
 
-    yield from async_add_devices(devices)
+    async_add_devices(devices)
 
 
 class EnvisalinkBinarySensor(EnvisalinkDevice, BinarySensorDevice):
@@ -52,8 +53,11 @@ class EnvisalinkBinarySensor(EnvisalinkDevice, BinarySensorDevice):
         _LOGGER.debug('Setting up zone: ' + zone_name)
         super().__init__(zone_name, info, controller)
 
+    @asyncio.coroutine
+    def async_added_to_hass(self):
+        """Register callbacks."""
         async_dispatcher_connect(
-            hass, SIGNAL_ZONE_UPDATE, self._update_callback)
+            self.hass, SIGNAL_ZONE_UPDATE, self._update_callback)
 
     @property
     def device_state_attributes(self):

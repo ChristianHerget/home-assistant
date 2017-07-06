@@ -13,15 +13,15 @@ from homeassistant.core import callback
 from homeassistant.components.sensor import ENTITY_ID_FORMAT, PLATFORM_SCHEMA
 from homeassistant.const import (
     ATTR_FRIENDLY_NAME, ATTR_UNIT_OF_MEASUREMENT, CONF_VALUE_TEMPLATE,
-    ATTR_ENTITY_ID, CONF_SENSORS)
+    CONF_ICON_TEMPLATE, ATTR_ENTITY_ID, CONF_SENSORS,
+    EVENT_HOMEASSISTANT_START)
 from homeassistant.exceptions import TemplateError
+import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity, async_generate_entity_id
 from homeassistant.helpers.event import async_track_state_change
-import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.restore_state import async_get_last_state
 
 _LOGGER = logging.getLogger(__name__)
-
-CONF_ICON_TEMPLATE = 'icon_template'
 
 SENSOR_SCHEMA = vol.Schema({
     vol.Required(CONF_VALUE_TEMPLATE): cv.template,
@@ -39,7 +39,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 @asyncio.coroutine
 # pylint: disable=unused-argument
 def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
-    """Setup the template sensors."""
+    """Set up the template sensors."""
     sensors = []
 
     for device, device_config in config[CONF_SENSORS].items():
@@ -69,7 +69,7 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
         _LOGGER.error("No sensors added")
         return False
 
-    yield from async_add_devices(sensors, True)
+    async_add_devices(sensors)
     return True
 
 
@@ -88,14 +88,30 @@ class SensorTemplate(Entity):
         self._state = None
         self._icon_template = icon_template
         self._icon = None
+        self._entities = entity_ids
+
+    @asyncio.coroutine
+    def async_added_to_hass(self):
+        """Register callbacks."""
+        state = yield from async_get_last_state(self.hass, self.entity_id)
+        if state:
+            self._state = state.state
 
         @callback
         def template_sensor_state_listener(entity, old_state, new_state):
-            """Called when the target device changes state."""
-            hass.async_add_job(self.async_update_ha_state, True)
+            """Handle device state changes."""
+            self.hass.async_add_job(self.async_update_ha_state(True))
 
-        async_track_state_change(
-            hass, entity_ids, template_sensor_state_listener)
+        @callback
+        def template_sensor_startup(event):
+            """Update template on startup."""
+            async_track_state_change(
+                self.hass, self._entities, template_sensor_state_listener)
+
+            self.hass.async_add_job(self.async_update_ha_state(True))
+
+        self.hass.bus.async_listen_once(
+            EVENT_HOMEASSISTANT_START, template_sensor_startup)
 
     @property
     def name(self):

@@ -1,13 +1,13 @@
 """Helper methods to help with platform discovery.
 
 There are two different types of discoveries that can be fired/listened for.
- - listen/discover is for services. These are targetted at a component.
+ - listen/discover is for services. These are targeted at a component.
  - listen_platform/discover_platform is for platforms. These are used by
    components to allow discovery of their platforms.
 """
 import asyncio
 
-from homeassistant import bootstrap, core
+from homeassistant import setup, core
 from homeassistant.const import (
     ATTR_DISCOVERED, ATTR_SERVICE, EVENT_PLATFORM_DISCOVERED)
 from homeassistant.exceptions import HomeAssistantError
@@ -19,7 +19,7 @@ ATTR_PLATFORM = 'platform'
 
 
 def listen(hass, service, callback):
-    """Setup listener for discovery of specific service.
+    """Set up listener for discovery of specific service.
 
     Service can be a string or a list/tuple.
     """
@@ -29,7 +29,7 @@ def listen(hass, service, callback):
 
 @core.callback
 def async_listen(hass, service, callback):
-    """Setup listener for discovery of specific service.
+    """Set up listener for discovery of specific service.
 
     Service can be a string or a list/tuple.
     """
@@ -63,20 +63,8 @@ def async_discover(hass, service, discovered=None, component=None,
             'Cannot discover the {} component.'.format(component))
 
     if component is not None and component not in hass.config.components:
-        did_lock = False
-        setup_lock = hass.data.get('setup_lock')
-        if setup_lock and setup_lock.locked():
-            did_lock = True
-            yield from setup_lock.acquire()
-
-        try:
-            # Could have been loaded while waiting for lock.
-            if component not in hass.config.components:
-                yield from bootstrap.async_setup_component(hass, component,
-                                                           hass_config)
-        finally:
-            if did_lock:
-                setup_lock.release()
+        yield from setup.async_setup_component(
+            hass, component, hass_config)
 
     data = {
         ATTR_SERVICE: service
@@ -160,22 +148,11 @@ def async_load_platform(hass, component, platform, discovered=None,
         raise HomeAssistantError(
             'Cannot discover the {} component.'.format(component))
 
-    did_lock = False
-    setup_lock = hass.data.get('setup_lock')
-    if setup_lock and setup_lock.locked():
-        did_lock = True
-        yield from setup_lock.acquire()
-
     setup_success = True
 
-    try:
-        # Could have been loaded while waiting for lock.
-        if component not in hass.config.components:
-            setup_success = yield from bootstrap.async_setup_component(
-                hass, component, hass_config)
-    finally:
-        if did_lock:
-            setup_lock.release()
+    if component not in hass.config.components:
+        setup_success = yield from setup.async_setup_component(
+            hass, component, hass_config)
 
     # No need to fire event if we could not setup component
     if not setup_success:

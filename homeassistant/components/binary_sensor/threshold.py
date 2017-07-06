@@ -52,7 +52,7 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
     limit_type = config.get(CONF_TYPE)
     device_class = get_deprecated(config, CONF_DEVICE_CLASS, CONF_SENSOR_CLASS)
 
-    yield from async_add_devices(
+    async_add_devices(
         [ThresholdSensor(hass, entity_id, name, threshold, limit_type,
                          device_class)], True)
     return True
@@ -77,7 +77,7 @@ class ThresholdSensor(BinarySensorDevice):
         # pylint: disable=invalid-name
         def async_threshold_sensor_state_listener(
                 entity, old_state, new_state):
-            """Called when the sensor changes state."""
+            """Handle sensor state changes."""
             if new_state.state == STATE_UNKNOWN:
                 return
 

@@ -13,7 +13,7 @@ from homeassistant.components.notify import (
     PLATFORM_SCHEMA, BaseNotificationService)
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_USERNAME
 
-REQUIREMENTS = ['TwitterAPI==2.4.4']
+REQUIREMENTS = ['TwitterAPI==2.4.5']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,5 +64,4 @@ class TwitterNotificationService(BaseNotificationService):
             error_message = obj['errors'][0]['message']
             error_code = obj['errors'][0]['code']
             _LOGGER.error("Error %s : %s (Code %s)", resp.status_code,
-                          error_message,
-                          error_code)
+                          error_message, error_code)

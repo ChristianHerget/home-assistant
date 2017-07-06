@@ -46,7 +46,7 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
     if value_template is not None:
         value_template.hass = hass
 
-    yield from async_add_devices([MqttBinarySensor(
+    async_add_devices([MqttBinarySensor(
         config.get(CONF_NAME),
         config.get(CONF_STATE_TOPIC),
         get_deprecated(config, CONF_DEVICE_CLASS, CONF_SENSOR_CLASS),
@@ -79,7 +79,7 @@ class MqttBinarySensor(BinarySensorDevice):
         """
         @callback
         def message_received(topic, payload, qos):
-            """A new MQTT message has been received."""
+            """Handle a new received MQTT message."""
             if self._template is not None:
                 payload = self._template.async_render_with_possible_json_value(
                     payload)
@@ -95,7 +95,7 @@ class MqttBinarySensor(BinarySensorDevice):
 
     @property
     def should_poll(self):
-        """No polling needed."""
+        """Return the polling state."""
         return False
 
     @property

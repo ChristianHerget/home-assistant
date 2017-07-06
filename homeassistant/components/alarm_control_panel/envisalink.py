@@ -55,7 +55,7 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
         )
         devices.append(device)
 
-    yield from async_add_devices(devices)
+    async_add_devices(devices)
 
     @callback
     def alarm_keypress_handler(service):
@@ -70,8 +70,8 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
             device.async_alarm_keypress(keypress)
 
     # Register Envisalink specific services
-    descriptions = yield from hass.loop.run_in_executor(
-        None, load_yaml_config_file, os.path.join(
+    descriptions = yield from hass.async_add_job(
+        load_yaml_config_file, os.path.join(
             os.path.dirname(__file__), 'services.yaml'))
 
     hass.services.async_register(
@@ -94,14 +94,17 @@ class EnvisalinkAlarm(EnvisalinkDevice, alarm.AlarmControlPanel):
         _LOGGER.debug("Setting up alarm: %s", alarm_name)
         super().__init__(alarm_name, info, controller)
 
+    @asyncio.coroutine
+    def async_added_to_hass(self):
+        """Register callbacks."""
         async_dispatcher_connect(
-            hass, SIGNAL_KEYPAD_UPDATE, self._update_callback)
+            self.hass, SIGNAL_KEYPAD_UPDATE, self._update_callback)
         async_dispatcher_connect(
-            hass, SIGNAL_PARTITION_UPDATE, self._update_callback)
+            self.hass, SIGNAL_PARTITION_UPDATE, self._update_callback)
 
     @callback
     def _update_callback(self, partition):
-        """Update HA state, if needed."""
+        """Update Home Assistant state, if needed."""
         if partition is None or int(partition) == self._partition_number:
             self.hass.async_add_job(self.async_update_ha_state())
 

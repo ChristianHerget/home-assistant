@@ -8,17 +8,17 @@ import logging
 
 import voluptuous as vol
 
+import homeassistant.helpers.config_validation as cv
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP, CONF_HOST, CONF_PORT)
 from homeassistant.helpers.entity import Entity
-import homeassistant.helpers.config_validation as cv
 
 REQUIREMENTS = ['knxip==0.3.3']
 
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_HOST = '0.0.0.0'
-DEFAULT_PORT = '3671'
+DEFAULT_PORT = 3671
 DOMAIN = 'knx'
 
 EVENT_KNX_FRAME_RECEIVED = 'knx_frame_received'
@@ -34,7 +34,7 @@ CONFIG_SCHEMA = vol.Schema({
 
 
 def setup(hass, config):
-    """Setup the connection to the KNX IP interface."""
+    """Set up the connection to the KNX IP interface."""
     global KNXTUNNEL
 
     from knxip.ip import KNXIPTunnel
@@ -51,7 +51,7 @@ def setup(hass, config):
         res = KNXTUNNEL.connect()
         _LOGGER.debug("Res = %s", res)
         if not res:
-            _LOGGER.exception("Could not connect to KNX/IP interface %s", host)
+            _LOGGER.error("Could not connect to KNX/IP interface %s", host)
             return False
 
     except KNXException as ex:
@@ -94,12 +94,12 @@ class KNXConfig(object):
 
     @property
     def name(self):
-        """The name given to the entity."""
+        """Return the name given to the entity."""
         return self.config['name']
 
     @property
     def address(self):
-        """The address of the device as an integer value.
+        """Return the address of the device as an integer value.
 
         3 types of addresses are supported:
         integer - 0-65535
@@ -110,7 +110,7 @@ class KNXConfig(object):
 
     @property
     def state_address(self):
-        """The group address the device sends its current state to.
+        """Return the group address the device sends its current state to.
 
         Some KNX devices can send the current state to a seperate
         group address. This makes send e.g. when an actuator can
@@ -127,7 +127,10 @@ class KNXGroupAddress(Entity):
         self._config = config
         self._state = False
         self._data = None
-        _LOGGER.debug("Initalizing KNX group address %s", self.address)
+        _LOGGER.debug(
+            "Initalizing KNX group address for %s (%s)",
+            self.name, self.address
+        )
 
         def handle_knx_message(addr, data):
             """Handle an incoming KNX frame.
@@ -145,12 +148,12 @@ class KNXGroupAddress(Entity):
 
     @property
     def name(self):
-        """The entity's display name."""
+        """Return the entity's display name."""
         return self._config.name
 
     @property
     def config(self):
-        """The entity's configuration."""
+        """Return the entity's configuration."""
         return self._config
 
     @property
@@ -175,7 +178,7 @@ class KNXGroupAddress(Entity):
 
     @property
     def cache(self):
-        """The name given to the entity."""
+        """Return the name given to the entity."""
         return self._config.config.get('cache', True)
 
     def group_write(self, value):
@@ -198,11 +201,15 @@ class KNXGroupAddress(Entity):
                 self._data = res
             else:
                 _LOGGER.debug(
-                    "Unable to read from KNX address: %s (None)", self.address)
+                    "%s: unable to read from KNX address: %s (None)",
+                    self.name, self.address
+                )
 
         except KNXException:
             _LOGGER.exception(
-                "Unable to read from KNX address: %s", self.address)
+                "%s: unable to read from KNX address: %s",
+                self.name, self.address
+            )
             return False
 
 
@@ -212,9 +219,6 @@ class KNXMultiAddressDevice(Entity):
     This is needed for devices like dimmers or shutter actuators as they have
     to be controlled by multiple group addresses.
     """
-
-    names = {}
-    values = {}
 
     def __init__(self, hass, config, required, optional=None):
         """Initialize the device.
@@ -226,43 +230,79 @@ class KNXMultiAddressDevice(Entity):
         """
         from knxip.core import parse_group_address, KNXException
 
+        self.names = {}
+        self.values = {}
+
         self._config = config
         self._state = False
         self._data = None
-        _LOGGER.debug("Initalizing KNX multi address device")
+        _LOGGER.debug(
+            "%s: initalizing KNX multi address device",
+            self.name
+        )
+
+        settings = self._config.config
+        if config.address:
+            _LOGGER.debug(
+                "%s: base address: address=%s",
+                self.name, settings.get('address')
+            )
+            self.names[config.address] = 'base'
+        if config.state_address:
+            _LOGGER.debug(
+                "%s, state address: state_address=%s",
+                self.name, settings.get('state_address')
+            )
+            self.names[config.state_address] = 'state'
 
         # parse required addresses
         for name in required:
-            _LOGGER.info(name)
             paramname = '{}{}'.format(name, '_address')
-            addr = self._config.config.get(paramname)
+            addr = settings.get(paramname)
             if addr is None:
-                _LOGGER.exception(
-                    "Required KNX group address %s missing", paramname)
+                _LOGGER.error(
+                    "%s: Required KNX group address %s missing",
+                    self.name, paramname
+                )
                 raise KNXException(
-                    "Group address for %s missing in configuration", paramname)
+                    "%s: Group address for {} missing in "
+                    "configuration for {}".format(
+                        self.name, paramname
+                    )
+                )
+            _LOGGER.debug(
+                "%s: (required parameter) %s=%s",
+                self.name, paramname, addr
+            )
             addr = parse_group_address(addr)
             self.names[addr] = name
 
         # parse optional addresses
         for name in optional:
             paramname = '{}{}'.format(name, '_address')
-            addr = self._config.config.get(paramname)
+            addr = settings.get(paramname)
+            _LOGGER.debug(
+                "%s: (optional parameter) %s=%s",
+                self.name, paramname, addr
+            )
             if addr:
                 try:
                     addr = parse_group_address(addr)
                 except KNXException:
-                    _LOGGER.exception("Cannot parse group address %s", addr)
+                    _LOGGER.exception(
+                        "%s: cannot parse group address %s",
+                        self.name, addr
+                    )
                 self.names[addr] = name
 
     @property
     def name(self):
-        """The entity's display name."""
+        """Return the entity's display name."""
         return self._config.name
 
     @property
     def config(self):
-        """The entity's configuration."""
+        """Return the entity's configuration."""
         return self._config
 
     @property
@@ -272,7 +312,7 @@ class KNXMultiAddressDevice(Entity):
 
     @property
     def cache(self):
-        """The name given to the entity."""
+        """Return the name given to the entity."""
         return self._config.config.get('cache', True)
 
     def has_attribute(self, name):
@@ -280,10 +320,52 @@ class KNXMultiAddressDevice(Entity):
 
         This is mostly important for optional addresses.
         """
-        for attributename, dummy_attribute in self.names.items():
+        for attributename in self.names.values():
             if attributename == name:
                 return True
         return False
+
+    def set_percentage(self, name, percentage):
+        """Set a percentage in knx for a given attribute.
+
+        DPT_Scaling / DPT 5.001 is a single byte scaled percentage
+        """
+        percentage = abs(percentage)  # only accept positive values
+        scaled_value = percentage * 255 / 100
+        value = min(255, scaled_value)
+        return self.set_int_value(name, value)
+
+    def get_percentage(self, name):
+        """Get a percentage from knx for a given attribute.
+
+        DPT_Scaling / DPT 5.001 is a single byte scaled percentage
+        """
+        value = self.get_int_value(name)
+        percentage = round(value * 100 / 255)
+        return percentage
+
+    def set_int_value(self, name, value, num_bytes=1):
+        """Set an integer value for a given attribute."""
+        # KNX packets are big endian
+        value = round(value)      # only accept integers
+        b_value = value.to_bytes(num_bytes, byteorder='big')
+        return self.set_value(name, list(b_value))
+
+    def get_int_value(self, name):
+        """Get an integer value for a given attribute."""
+        # KNX packets are big endian
+        summed_value = 0
+        raw_value = self.value(name)
+        try:
+            # convert raw value in bytes
+            for val in raw_value:
+                summed_value *= 256
+                summed_value += val
+        except TypeError:
+            # pknx returns a non-iterable type for unsuccessful reads
+            pass
+
+        return summed_value
 
     def value(self, name):
         """Return the value to a given named attribute."""
@@ -295,13 +377,21 @@ class KNXMultiAddressDevice(Entity):
                 addr = attributeaddress
 
         if addr is None:
-            _LOGGER.exception("Attribute %s undefined", name)
+            _LOGGER.error("%s: attribute '%s' undefined",
+                          self.name, name)
+            _LOGGER.debug(
+                "%s: defined attributes: %s",
+                self.name, str(self.names)
+            )
             return False
 
         try:
             res = KNXTUNNEL.group_read(addr, use_cache=self.cache)
         except KNXException:
-            _LOGGER.exception("Unable to read from KNX address: %s", addr)
+            _LOGGER.exception(
+                "%s: unable to read from KNX address: %s",
+                self.name, addr
+            )
             return False
 
         return res
@@ -316,13 +406,21 @@ class KNXMultiAddressDevice(Entity):
                 addr = attributeaddress
 
         if addr is None:
-            _LOGGER.exception("Attribute %s undefined", name)
+            _LOGGER.error("%s: attribute '%s' undefined",
+                          self.name, name)
+            _LOGGER.debug(
+                "%s: defined attributes: %s",
+                self.name, str(self.names)
+            )
             return False
 
         try:
             KNXTUNNEL.group_write(addr, value)
         except KNXException:
-            _LOGGER.exception("Unable to write to KNX address: %s", addr)
+            _LOGGER.exception(
+                "%s: unable to write to KNX address: %s",
+                self.name, addr
+            )
             return False
 
         return True
